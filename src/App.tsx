@@ -24,6 +24,9 @@ import { Register } from "./pages/Register";
 import { FormsPage } from "./pages/FormsPage";
 import { CampaignProvider } from "./contexts/CampaignContext";
 import { FeedBackProvider } from "./contexts/FeedBackContext";
+import { ReportsProvider } from "./contexts/RepostsContext"; // 👈 3. IMPORTA O PROVIDER
+
+const allFeedbacks = []
 
 const queryClient = new QueryClient();
 
@@ -35,6 +38,7 @@ const App = () => (
           <FormProvider>
             <CampaignProvider>
               <FeedBackProvider>
+                <ReportsProvider allFeedbacks={allFeedbacks}> {/* 👈 4. ENVOLVE A APLICAÇÃO COM O PROVIDER */}
             <TooltipProvider>
               <Toaster />
               <Sonner />
@@ -63,6 +67,7 @@ const App = () => (
                 </Routes>
               </BrowserRouter>
             </TooltipProvider>
+                </ReportsProvider>
               </FeedBackProvider>
             </CampaignProvider>
           </FormProvider>

@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-// O CustomerContext exporta o tipo 'Customer' com a estrutura { pessoa: { nome: '...' } }
 import { useCustomer, Customer } from "../contexts/CustomerContext";
-// O ProductContext exporta o tipo 'Product' com a estrutura { nome: '...' }
 import { useProduct, Product } from "../contexts/ProductContext";
-import { useFeedBack, FeedbackApiRequest } from "@/contexts/FeedBackContext";
+// Importa os novos tipos e a função do contexto
+import { useFeedBack, FeedbackApiRequest, ManualFeedbackRequest } from "@/contexts/FeedBackContext";
 
 import {
   Star,
@@ -18,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  FileJson,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,10 +31,9 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-// Tipo ajustado para refletir a estrutura de dados final da tela
 type DisplayFeedback = {
   id: string;
-  customerId: string; // ID do cliente (string)
+  customerId: string;
   customerName: string;
   productName: string;
   rating: number;
@@ -79,13 +78,13 @@ const ITEMS_PER_PAGE = 5;
 export const FeedbacksPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  // Obtém as listas completas dos contextos
   const { customers } = useCustomer();
   const { products } = useProduct();
   const {
     feedbacks: apiFeedbacks,
     fetchFeedbacks,
     createFeedback,
+    createManualFeedback, // <-- Pega a nova função do contexto
     deleteFeedback,
     loading,
     error: apiError,
@@ -115,7 +114,6 @@ export const FeedbacksPage = () => {
     fetchFeedbacks();
   }, [fetchFeedbacks]);
 
-  // Lógica de busca de clientes, usando a estrutura correta `c.pessoa.nome`
   const filteredCustomers = useMemo(() => {
     if (!customerSearchTerm) return [];
     return customers.filter((c) =>
@@ -123,7 +121,6 @@ export const FeedbacksPage = () => {
     );
   }, [customerSearchTerm, customers]);
 
-  // Lógica de busca de produtos, usando `p.nome`
   const filteredProducts = useMemo(() => {
     if (!productSearchTerm) return [];
     return products.filter((p) =>
@@ -131,8 +128,6 @@ export const FeedbacksPage = () => {
     );
   }, [productSearchTerm, products]);
 
-
-  // Lógica de transformação de dados que agora vive inteiramente no componente
   const transformedFeedbacks = useMemo((): DisplayFeedback[] => {
     return (apiFeedbacks || []).map((fb) => {
       const getAnswer = (questionId: string) =>
@@ -141,7 +136,6 @@ export const FeedbacksPage = () => {
       const customerId = getAnswer("customerId");
       const productId = getAnswer("productId");
 
-      // A busca é feita aqui, usando .find() nas listas do contexto
       const customer = customerId ? customers.find((c) => c.id === customerId) : null;
       const product = productId ? products.find((p) => p.id === productId) : null;
 
@@ -157,7 +151,7 @@ export const FeedbacksPage = () => {
         type: getAnswer("feedbackType") || "Empresa",
       };
     });
-  }, [apiFeedbacks, customers, products]); // Depende das listas completas
+  }, [apiFeedbacks, customers, products]);
 
   const filteredFeedbacks = useMemo(() => {
     setCurrentPage(1);
@@ -179,15 +173,12 @@ export const FeedbacksPage = () => {
         const matchEndDate = filters.endDate
           ? new Date(fb.date) <= new Date(filters.endDate)
           : true;
-  
+    
         return (
           matchSearch && matchType && matchRating && matchStartDate && matchEndDate
         );
       });
   }, [transformedFeedbacks, filters]);
-
-  // O resto do componente (handlers de formulário, paginação, etc.) permanece o mesmo que na versão anterior.
-  // ... (O restante do código, como `paginatedFeedbacks`, handlers e JSX, é idêntico à resposta anterior)
   
   const paginatedFeedbacks = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -210,7 +201,6 @@ export const FeedbacksPage = () => {
         window.history.replaceState({}, document.title);
     }, [location.state, customers, products]);
 
-
   const clearForm = () => {
     setSelectedCustomer(null);
     setCustomerSearchTerm("");
@@ -225,6 +215,7 @@ export const FeedbacksPage = () => {
   };
 
   const handleDeleteFeedback = async (idToDelete: string) => {
+    // Usando um modal customizado no futuro seria melhor
     if (window.confirm("Tem certeza que deseja excluir este feedback?")) {
       const success = await deleteFeedback(idToDelete);
       setAlerta({
@@ -270,6 +261,43 @@ export const FeedbacksPage = () => {
     }
     setTimeout(() => setAlerta(null), 4000);
   };
+
+  // =======================================================================
+  // NOVA FUNÇÃO PARA LIDAR COM O ENVIO MANUAL 👇
+  // =======================================================================
+  const handleAddManualFeedback = async () => {
+    const manualJson: ManualFeedbackRequest = {
+      "formularioId": "03f347c2-3d16-4816-8773-ae25aa5d9821",
+      "envioId": "fb74e297-7b13-4634-8532-5b48ecb6f3db",
+      "respostas": [
+        {
+          "perguntaId": "comment", // Mapeado para 'comment'
+          "tipo": "texto",
+          "resposta_texto": "Gostei do atendimento, mas o produto veio com defeito."
+        },
+        {
+          "perguntaId": "rating", // Mapeado para 'rating'
+          "tipo": "nota",
+          "nota": 2
+        },
+        // Adicionando os campos que faltam para o feedback ser completo na UI
+        { "perguntaId": "customerId", "tipo": "texto", "resposta_texto": customers[0]?.id || "cliente-padrao" },
+        { "perguntaId": "productId", "tipo": "texto", "resposta_texto": products[0]?.id || "produto-padrao" },
+        { "perguntaId": "employeeName", "tipo": "texto", "resposta_texto": "Atendente Manual" },
+        { "perguntaId": "feedbackType", "tipo": "texto", "resposta_texto": "Produto" },
+      ]
+    };
+
+    setAlerta({ tipo: "success", mensagem: "Processando feedback manual..." });
+    const result = await createManualFeedback(manualJson);
+
+    if (result) {
+      setAlerta({ tipo: "success", mensagem: "Feedback manual adicionado com sucesso!" });
+    } else {
+      setAlerta({ tipo: "danger", mensagem: apiError || "Não foi possível adicionar o feedback manual." });
+    }
+    setTimeout(() => setAlerta(null), 4000);
+  };
   
   return (
     <div className="p-4 md:p-8 space-y-8">
@@ -279,7 +307,10 @@ export const FeedbacksPage = () => {
         <CardHeader><CardTitle>Adicionar Feedback</CardTitle></CardHeader>
         <CardContent>
           {alerta && (<div className={`p-3 rounded-md mb-4 text-sm ${ alerta.tipo === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800" }`}>{alerta.mensagem}</div>)}
+          
+          {/* Formulário Principal */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* ... (código de busca de cliente) ... */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">1. Cliente</label>
               {!selectedCustomer ? (
@@ -291,7 +322,7 @@ export const FeedbacksPage = () => {
                       {filteredCustomers.length > 0 ? (
                         filteredCustomers.map((c) => (
                           <li key={c.id} onClick={() => { setSelectedCustomer(c); setCustomerSearchTerm(""); }} className="p-2 hover:bg-primary/10 cursor-pointer">
-                            {c.pessoa.nome} {/* Exibe o nome corretamente */}
+                            {c.pessoa.nome}
                           </li>
                         ))
                       ) : (
@@ -307,11 +338,12 @@ export const FeedbacksPage = () => {
                 </div>
               ) : (
                 <div className="p-2 bg-muted rounded-md flex justify-between items-center">
-                  <span className="font-medium">{selectedCustomer.pessoa.nome}</span> {/* Exibe o nome corretamente */}
+                  <span className="font-medium">{selectedCustomer.pessoa.nome}</span>
                   <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedCustomer(null)}><X className="w-4 h-4" /></Button>
                 </div>
               )}
             </div>
+            {/* ... (código de busca de produto) ... */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">2. Produto</label>
               {!selectedProduct ? (
@@ -319,23 +351,23 @@ export const FeedbacksPage = () => {
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input type="text" value={productSearchTerm} onChange={(e) => setProductSearchTerm(e.target.value)} placeholder="Busque o produto..." className="pl-9" />
                   {productSearchTerm && (
-                     <ul className="border rounded-md max-h-32 overflow-y-auto bg-white z-10 absolute w-full shadow-lg">
-                       {filteredProducts.length > 0 ? (
-                         filteredProducts.map((p) => (
-                           <li key={p.id} onClick={() => { setSelectedProduct(p); setProductSearchTerm(""); }} className="p-2 hover:bg-primary/10 cursor-pointer">
-                             {p.nome}
-                           </li>
-                         ))
-                       ) : (
-                         <div className="p-2 text-center text-gray-500">
-                           <p className="text-sm">Produto não encontrado.</p>
-                           <Button variant="link" size="sm" className="h-auto p-0" onClick={() => navigate("/products", { state: { from: "/feedbacks" } })}>
-                             Cadastrar Novo Produto
-                           </Button>
-                         </div>
-                       )}
-                     </ul>
-                   )}
+                       <ul className="border rounded-md max-h-32 overflow-y-auto bg-white z-10 absolute w-full shadow-lg">
+                           {filteredProducts.length > 0 ? (
+                             filteredProducts.map((p) => (
+                               <li key={p.id} onClick={() => { setSelectedProduct(p); setProductSearchTerm(""); }} className="p-2 hover:bg-primary/10 cursor-pointer">
+                                 {p.nome}
+                               </li>
+                             ))
+                           ) : (
+                             <div className="p-2 text-center text-gray-500">
+                               <p className="text-sm">Produto não encontrado.</p>
+                               <Button variant="link" size="sm" className="h-auto p-0" onClick={() => navigate("/products", { state: { from: "/feedbacks" } })}>
+                                 Cadastrar Novo Produto
+                               </Button>
+                             </div>
+                           )}
+                       </ul>
+                     )}
                 </div>
               ) : (
                 <div className="p-2 bg-muted rounded-md flex justify-between items-center">
@@ -348,7 +380,7 @@ export const FeedbacksPage = () => {
 
           {selectedCustomer && selectedProduct && (
             <form onSubmit={handleAddFeedback} className="space-y-6 pt-6 border-t">
-              {/* O formulário permanece idêntico */}
+              {/* ... (código do formulário) ... */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium">Atendente</label>
@@ -382,16 +414,25 @@ export const FeedbacksPage = () => {
               </div>
             </form>
           )}
+
+          {/* Botão para Adição Manual */}
+          <div className="mt-6 pt-6 border-t text-center">
+              <p className="text-sm text-muted-foreground mb-2">Ou adicione um feedback a partir de um JSON para teste:</p>
+              <Button variant="secondary" onClick={handleAddManualFeedback} disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <FileJson className="mr-2 h-4 w-4" />
+                  Adicionar Feedback Manual
+              </Button>
+          </div>
         </CardContent>
       </Card>
       
-      {/* A seção de listagem e filtros permanece idêntica */}
       <Card>
         <CardHeader><CardTitle>Feedbacks Recebidos</CardTitle></CardHeader>
         <CardContent>
-             {/* Filtros */}
+            {/* ... (código da listagem e filtros) ... */}
             <div className="space-y-4">
-            {loading && (<div className="text-center py-8 flex items-center justify-center text-gray-500"><Loader2 className="mr-2 h-5 w-5 animate-spin" />Carregando feedbacks...</div>)}
+            {loading && !paginatedFeedbacks.length && (<div className="text-center py-8 flex items-center justify-center text-gray-500"><Loader2 className="mr-2 h-5 w-5 animate-spin" />Carregando feedbacks...</div>)}
             {apiError && (<p className="text-center text-red-500 py-8">Erro ao carregar feedbacks: {apiError}</p>)}
             {!loading && !apiError && paginatedFeedbacks.map((fb) => (
                 <div key={fb.id} className="border-b pb-4 last:border-b-0">
@@ -417,7 +458,6 @@ export const FeedbacksPage = () => {
               ))}
             {!loading && !apiError && filteredFeedbacks.length === 0 && (<p className="text-center text-gray-500 py-8">Nenhum feedback corresponde aos filtros selecionados.</p>)}
             </div>
-            {/* Paginação */}
         </CardContent>
       </Card>
     </div>

@@ -45,6 +45,8 @@ interface FormContextType {
   addQuestion: (questionData: NewQuestionData) => Promise<Pergunta | void>;
   deleteForm: (formId: string) => Promise<void>;
   updateForm: (formId: string, updatedData: Partial<FormPayload>) => Promise<Formulario | void>;
+  deleteQuestion: (questionId: string) => Promise<void>;
+  updateQuestion: (questionId: string, updatedData: Partial<NewQuestionData>) => Promise<Pergunta | void>;
 }
 
 const FormContext = createContext<FormContextType | undefined>(undefined);
@@ -163,8 +165,33 @@ export const FormProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const deleteQuestion = async (questionId: string) => {
+    try {
+      await api.delete(`/deletar-pergunta/${questionId}`);
+      setPerguntas(current => current.filter(q => q.id !== questionId));
+      toast({ title: "Sucesso", description: "Pergunta excluída com sucesso!" });
+    } catch (error) {
+      console.error("Erro ao excluir pergunta:", error);
+      toast({ title: "Erro", description: "Não foi possível excluir a pergunta.", variant: "destructive" });
+    }
+  }
+
+const updateQuestion = async (questionId: string, updatedData: Partial<NewQuestionData>) => {
+  try {
+    // Adicionado `updatedData` para ser enviado na requisição
+    const response = await api.put(`/atualizar-pergunta/${questionId}`, updatedData);
+    const updatedQuestion = response.data;
+    setPerguntas(current => current.map(q => (q.id === questionId ? updatedQuestion : q)));
+    toast({ title: "Sucesso", description: "Pergunta atualizada com sucesso!" });
+    return updatedQuestion;
+  } catch (error) {
+    console.error("Erro ao atualizar pergunta:", error);
+    toast({ title: "Erro", description: "Não foi possível atualizar a pergunta.", variant: "destructive" });
+  }
+}
+
   return (
-    <FormContext.Provider value={{ formularios, perguntas, loading, getFormById, addForm, addQuestion, deleteForm, updateForm }}>
+    <FormContext.Provider value={{ formularios, perguntas, loading, getFormById, addForm, addQuestion, deleteQuestion, updateQuestion, deleteForm, updateForm }}>
       {children}
     </FormContext.Provider>
   );

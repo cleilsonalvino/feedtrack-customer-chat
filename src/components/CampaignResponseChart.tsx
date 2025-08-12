@@ -9,23 +9,16 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, {useContext, useState} from "react";
 import { BarChart3 } from "lucide-react"; // Importar o ícone
+import { useCampaign } from "@/contexts/CampaignContext";
 
-// Definindo a interface para os dados da campanha
-interface CampaignData {
-  name: string;
-  "Taxa de Resposta": number;
-}
 
-// Dados de exemplo tipados
-const data: CampaignData[] = [
-  { name: "Black Friday", "Taxa de Resposta": 62 },
-  { name: "Pós-Compra", "Taxa de Resposta": 63 },
-  { name: "Natal", "Taxa de Resposta": 70 },
-  { name: "Ano Novo", "Taxa de Resposta": 55 },
-];
 
 export const CampaignResponseChart = () => {
+
+  const { campaigns } = useCampaign();
+
   return (
     <Card>
       <CardHeader>
@@ -36,7 +29,7 @@ export const CampaignResponseChart = () => {
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart
-            data={data}
+            data={campaigns}
             margin={{
               top: 5,
               right: 30,
@@ -45,7 +38,7 @@ export const CampaignResponseChart = () => {
             }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
+            <XAxis dataKey="titulo" />
             <YAxis />
             <Tooltip />
             <Legend />

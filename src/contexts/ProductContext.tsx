@@ -1,5 +1,3 @@
-// src/contexts/ProductContext.tsx
-
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import api from '../lib/api';
 import { useToast } from "@/hooks/use-toast";
@@ -25,8 +23,9 @@ interface ProductContextType {
   products: Product[];
   loading: boolean;
   addProduct: (productData: NewProductData) => Promise<Product | void>;
+  addMultipleProducts: (productsData: NewProductData[]) => Promise<void>; // Nova função
   updateProduct: (updatedProduct: Product) => Promise<void>;
-  deleteProduct: (id: string) => Promise<void>; // Esta função agora desativa o produto
+  deleteProduct: (id: string) => Promise<void>;
 }
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
@@ -56,22 +55,62 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
     fetchProducts();
   }, [toast]);
 
-  const addProduct = async (productData: NewProductData) => {
+  const addProduct = async (productData: NewProductData, showToast = true) => {
     try {
       const response = await api.post('/produto', productData);
       const newProduct = response.data;
       setProducts(current => [...current, newProduct]);
-      toast({ title: "Sucesso", description: `Produto "${newProduct.nome}" adicionado!` });
+      if (showToast) {
+        toast({ title: "Sucesso", description: `Produto "${newProduct.nome}" adicionado!` });
+      }
       return newProduct;
     } catch (error) {
       console.error("Erro ao adicionar produto:", error);
-      toast({ title: "Erro", description: "Não foi possível adicionar o produto.", variant: "destructive" });
+      if (showToast) {
+        toast({ title: "Erro", description: `Não foi possível adicionar o produto "${productData.nome}".`, variant: "destructive" });
+      }
+      throw error; // Lança o erro para que o chamador saiba que falhou
+    }
+  };
+
+  // Função para adicionar múltiplos produtos a partir de um array
+  const addMultipleProducts = async (productsData: NewProductData[]) => {
+    let successCount = 0;
+    let errorCount = 0;
+
+    toast({
+        title: "Iniciando importação...",
+        description: `Adicionando ${productsData.length} produtos.`,
+    });
+
+    for (const productData of productsData) {
+      try {
+        // Chama a função de adicionar um produto, sem o toast individual
+        await addProduct(productData, false);
+        successCount++;
+      } catch (error) {
+        errorCount++;
+        console.error(`Falha ao adicionar o produto em lote: ${productData.nome}`, error);
+      }
+    }
+
+    // Exibe um toast de resumo no final
+    if (errorCount > 0) {
+        toast({
+            title: "Operação Concluída com Erros",
+            description: `${successCount} produtos adicionados. ${errorCount} falharam. Verifique o console.`,
+            variant: "destructive"
+        });
+    } else {
+        toast({
+            title: "Importação Concluída!",
+            description: `Todos os ${successCount} produtos foram adicionados com sucesso.`
+        });
     }
   };
 
   const updateProduct = async (productToUpdate: Product) => {
     try {
-      // O payload para a API deve conter todos os campos que podem ser atualizados.
       const payload = {
         nome: productToUpdate.nome,
         descricao: productToUpdate.descricao,
@@ -85,7 +124,6 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
       setProducts(current => 
         current.map(p => (p.id === productToUpdate.id ? productToUpdate : p))
       );
-      // Evita mostrar toast de "atualizado" ao desativar/reativar
       if (productToUpdate.ativo === products.find(p => p.id === productToUpdate.id)?.ativo) {
          toast({ title: "Sucesso", description: "Produto atualizado com sucesso!" });
       }
@@ -105,13 +143,12 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
       dataExclusao: new Date().toISOString(),
     };
     
-    // Reutiliza a função de update para desativar
     await updateProduct(deactivatedProduct);
     toast({ title: "Produto Desativado", description: `"${product.nome}" foi movido para os inativos.` });
   };
 
   return (
-    <ProductContext.Provider value={{ products, loading, addProduct, updateProduct, deleteProduct }}>
+    <ProductContext.Provider value={{ products, loading, addProduct, addMultipleProducts, updateProduct, deleteProduct }}>
       {children}
     </ProductContext.Provider>
   );

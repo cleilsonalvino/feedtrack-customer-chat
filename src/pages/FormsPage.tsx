@@ -48,39 +48,50 @@ import {
 import { Plus, Loader2, MoreVertical, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// Componente para o Modal de Criação de Pergunta
-const CreateQuestionModal = ({
-  onQuestionCreated,
+// Componente de Modal Refatorado para Criar e Editar Perguntas
+const QuestionModal = ({
+  isOpen,
+  onOpenChange,
+  questionToEdit,
+  onSave,
 }: {
-  onQuestionCreated: (newQuestion: Pergunta) => void;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  questionToEdit?: Pergunta | null;
+  onSave: (
+    data: { texto: string; tipo: "nota" | "texto" | "multipla_escolha" },
+    questionId?: string
+  ) => void;
 }) => {
-  const { addQuestion } = useForm();
-  const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
   const [texto, setTexto] = useState("");
   const [tipo, setTipo] = useState<"nota" | "texto" | "multipla_escolha">("nota");
+  const isEditMode = !!questionToEdit;
 
-  const handleCreateQuestion = async () => {
-    if (!texto) return;
-    const newQuestion = await addQuestion({ texto, tipo });
-    if (newQuestion) {
-      onQuestionCreated(newQuestion);
+  // Popula o formulário com dados existentes se estiver em modo de edição
+  useEffect(() => {
+    if (isEditMode && isOpen) {
+      setTexto(questionToEdit.texto);
+      setTipo(questionToEdit.tipo);
+    } else {
+      // Reseta para o modo de criação
       setTexto("");
       setTipo("nota");
-      setIsQuestionModalOpen(false);
     }
+  }, [questionToEdit, isOpen]);
+
+  const handleSaveClick = () => {
+    if (!texto) return;
+    onSave({ texto, tipo }, questionToEdit?.id);
+    onOpenChange(false); // Fecha o modal após salvar
   };
 
   return (
-    <Dialog open={isQuestionModalOpen} onOpenChange={setIsQuestionModalOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Plus className="w-4 h-4 mr-2" />
-          Criar Nova Pergunta
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Criar Nova Pergunta</DialogTitle>
+          <DialogTitle>
+            {isEditMode ? "Editar Pergunta" : "Criar Nova Pergunta"}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div>
@@ -108,13 +119,12 @@ const CreateQuestionModal = ({
           </div>
         </div>
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => setIsQuestionModalOpen(false)}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleCreateQuestion}>Criar Pergunta</Button>
+          <Button onClick={handleSaveClick}>
+            {isEditMode ? "Salvar Alterações" : "Criar Pergunta"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -131,16 +141,22 @@ const EditFormModal = ({
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }) => {
-  const { perguntas, updateForm } = useForm();
+  // Certifique-se de que `updateQuestion` e `addQuestion` estão disponíveis no seu hook
+  const { perguntas, updateForm, addQuestion, updateQuestion } = useForm();
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+
+  // Estado para controlar o modal de pergunta
+  const [questionModalState, setQuestionModalState] = useState<{
+    isOpen: boolean;
+    questionToEdit: Pergunta | null;
+  }>({ isOpen: false, questionToEdit: null });
 
   useEffect(() => {
     if (form) {
       setTitulo(form.titulo);
       setDescricao(form.descricao);
-      // CORRECTED: Use p.id since the data is now normalized
       setSelectedQuestionIds(form.perguntas.map((p) => p.id));
     }
   }, [form]);
@@ -155,85 +171,159 @@ const EditFormModal = ({
     onOpenChange(false);
   };
 
+  // Abre o modal para editar uma pergunta existente
+  const handleEditQuestion = (questionId: string) => {
+    const question = perguntas.find((p) => p.id === questionId);
+    if (question) {
+      setQuestionModalState({ isOpen: true, questionToEdit: question });
+    }
+  };
+
+  // Abre o modal para criar uma nova pergunta
+  const handleCreateQuestion = () => {
+    setQuestionModalState({ isOpen: true, questionToEdit: null });
+  };
+
+  // Salva a pergunta (cria ou atualiza)
+  const handleSaveQuestion = async (
+    data: { texto: string; tipo: "nota" | "texto" | "multipla_escolha" },
+    questionId?: string
+  ) => {
+    if (questionId && updateQuestion) {
+      // Modo de edição
+      await updateQuestion(questionId, data);
+    } else {
+      // Modo de criação
+      const newQuestion = await addQuestion(data);
+      if (newQuestion) {
+        setSelectedQuestionIds((prev) => [...prev, newQuestion.id]);
+      }
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Editar Formulário</DialogTitle>
-          <DialogDescription>
-            Altere o título, descrição e as perguntas do seu formulário.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid md:grid-cols-2 gap-8 py-4">
-          <div className="space-y-4">
-            <h3 className="font-semibold">Detalhes do Formulário</h3>
-            <div>
-              <Label htmlFor="edit-form-title">Título</Label>
-              <Input
-                id="edit-form-title"
-                value={titulo}
-                onChange={(e) => setTitulo(e.target.value)}
-              />
+    <>
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Editar Formulário</DialogTitle>
+            <DialogDescription>
+              Altere o título, descrição e as perguntas do seu formulário.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid md:grid-cols-2 gap-8 py-4">
+            <div className="space-y-4">
+              <h3 className="font-semibold">Detalhes do Formulário</h3>
+              <div>
+                <Label htmlFor="edit-form-title">Título</Label>
+                <Input
+                  id="edit-form-title"
+                  value={titulo}
+                  onChange={(e) => setTitulo(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-form-desc">Descrição</Label>
+                <Input
+                  id="edit-form-desc"
+                  value={descricao}
+                  onChange={(e) => setDescricao(e.target.value)}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="edit-form-desc">Descrição</Label>
-              <Input
-                id="edit-form-desc"
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-              />
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold">Perguntas Disponíveis</h3>
+                <Button variant="outline" size="sm" onClick={handleCreateQuestion}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Criar Nova Pergunta
+                </Button>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto border p-2 rounded-md">
+                {perguntas.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between space-x-2"
+                  >
+                    <div className="flex items-center space-x-2 flex-grow">
+                      <Checkbox
+                        className="justify-self-start"
+                        id={`q-edit-${p.id}`}
+                        checked={selectedQuestionIds.includes(p.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedQuestionIds((prev) =>
+                            checked
+                              ? [...prev, p.id]
+                              : prev.filter((id) => id !== p.id)
+                          );
+                        }}
+                      />
+                      <label htmlFor={`q-edit-${p.id}`} className="text-sm flex-grow">
+                        {p.texto || "Pergunta sem texto"}
+                      </label>
+                    </div>
+                    <Edit
+                      className="cursor-pointer w-4 h-4 text-muted-foreground hover:text-primary"
+                      onClick={() => handleEditQuestion(p.id)}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="space-y-4">
-            <h3 className="font-semibold">Perguntas Disponíveis</h3>
-            <div className="space-y-2 max-h-60 overflow-y-auto border p-2 rounded-md">
-              {perguntas.map((p) => (
-                // CORRECTED: Use p.id for keys and all other attributes
-                <div key={p.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`edit-q-${p.id}`}
-                    checked={selectedQuestionIds.includes(p.id)}
-                    onCheckedChange={(checked) => {
-                      setSelectedQuestionIds((prev) =>
-                        checked
-                          ? [...prev, p.id]
-                          : prev.filter((id) => id !== p.id)
-                      );
-                    }}
-                  />
-                  <label htmlFor={`edit-q-${p.id}`} className="text-sm">
-                    {p.texto}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancelar</Button>
-          </DialogClose>
-          <Button onClick={handleUpdate}>Salvar Alterações</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button onClick={handleUpdate}>Salvar Alterações</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* O modal de pergunta é renderizado aqui, controlado pelo estado */}
+      <QuestionModal
+        isOpen={questionModalState.isOpen}
+        onOpenChange={(open) =>
+          setQuestionModalState({ ...questionModalState, isOpen: open })
+        }
+        questionToEdit={questionModalState.questionToEdit}
+        onSave={handleSaveQuestion}
+      />
+    </>
   );
 };
 
 // Página Principal de Formulários
 export const FormsPage = () => {
-  const { formularios, perguntas, addForm, deleteForm, getFormById, loading } = useForm();
+  const {
+    formularios,
+    perguntas,
+    addForm,
+    deleteForm,
+    deleteQuestion,
+    getFormById,
+    addQuestion,
+    updateQuestion, // Garanta que está disponível
+    loading,
+  } = useForm();
   const { toast } = useToast();
 
-  // Estados para o modal de criação
+  // Estados para o modal de criação de formulário
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
 
-  // Estados para o modal de edição
+  // Estados para o modal de edição de formulário
   const [formToEdit, setFormToEdit] = useState<Formulario | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Estado para o modal de pergunta DENTRO do modal de criação de formulário
+  const [createFormQuestionModal, setCreateFormQuestionModal] = useState<{
+    isOpen: boolean;
+    questionToEdit: Pergunta | null;
+  }>({ isOpen: false, questionToEdit: null });
 
   const handleCreateForm = async () => {
     if (!titulo || selectedQuestionIds.length === 0) {
@@ -257,6 +347,14 @@ export const FormsPage = () => {
     }
   };
 
+  const handleDeleteQuestion = (questionId: string) => {
+    deleteQuestion(questionId);
+    toast({
+      title: "Pergunta removida",
+      description: "A pergunta foi removida com sucesso.",
+    });
+  };
+
   const handleEditClick = async (formId: string) => {
     setEditingId(formId);
     try {
@@ -266,6 +364,18 @@ export const FormsPage = () => {
       }
     } finally {
       setEditingId(null);
+    }
+  };
+
+  // Handler para salvar perguntas no contexto do modal de CRIAÇÃO de formulário
+  const handleSaveQuestionForCreateForm = async (
+    data: { texto: string; tipo: "nota" | "texto" | "multipla_escolha" },
+    questionId?: string
+  ) => {
+    // Neste contexto, sempre criaremos uma nova pergunta
+    const newQuestion = await addQuestion(data);
+    if (newQuestion) {
+      setSelectedQuestionIds((prev) => [...prev, newQuestion.id]);
     }
   };
 
@@ -289,7 +399,8 @@ export const FormsPage = () => {
             <DialogHeader>
               <DialogTitle>Criar Novo Formulário</DialogTitle>
               <DialogDescription>
-                Defina um título e selecione as perguntas que farão parte deste formulário.
+                Defina um título e selecione as perguntas que farão parte deste
+                formulário.
               </DialogDescription>
             </DialogHeader>
             <div className="grid md:grid-cols-2 gap-8 py-4">
@@ -315,34 +426,44 @@ export const FormsPage = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold">Perguntas Disponíveis</h3>
-                  <CreateQuestionModal
-                    onQuestionCreated={(newQuestion) => {
-                      // CORRECTED: Use newQuestion.id
-                      setSelectedQuestionIds((prev) => [
-                        ...prev,
-                        newQuestion.id,
-                      ]);
-                    }}
-                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCreateFormQuestionModal({ isOpen: true, questionToEdit: null })
+                    }
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Criar Nova Pergunta
+                  </Button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto border p-2 rounded-md">
                   {perguntas.map((p) => (
-                    // CORRECTED: Use p.id for keys and all attributes
-                    <div key={p.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`q-${p.id}`}
-                        checked={selectedQuestionIds.includes(p.id)}
-                        onCheckedChange={(checked) => {
-                          setSelectedQuestionIds((prev) =>
-                            checked
-                              ? [...prev, p.id]
-                              : prev.filter((id) => id !== p.id)
-                          );
-                        }}
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between space-x-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          className="justify-self-start"
+                          id={`q-create-${p.id}`}
+                          checked={selectedQuestionIds.includes(p.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedQuestionIds((prev) =>
+                              checked
+                                ? [...prev, p.id]
+                                : prev.filter((id) => id !== p.id)
+                            );
+                          }}
+                        />
+                        <label htmlFor={`q-create-${p.id}`} className="text-sm">
+                          {p.texto || "Pergunta sem texto"}
+                        </label>
+                      </div>
+                      <Trash2
+                        className="cursor-pointer w-4 h-4 text-red-500 hover:text-red-700"
+                        onClick={() => handleDeleteQuestion(p.id)}
                       />
-                      <label htmlFor={`q-${p.id}`} className="text-sm">
-                        {p.texto || 'Pergunta sem texto'}
-                      </label>
                     </div>
                   ))}
                 </div>
@@ -357,6 +478,14 @@ export const FormsPage = () => {
               </Button>
               <Button onClick={handleCreateForm}>Criar Formulário</Button>
             </DialogFooter>
+             <QuestionModal
+                isOpen={createFormQuestionModal.isOpen}
+                onOpenChange={(open) =>
+                  setCreateFormQuestionModal({ ...createFormQuestionModal, isOpen: open })
+                }
+                questionToEdit={createFormQuestionModal.questionToEdit}
+                onSave={handleSaveQuestionForCreateForm}
+              />
           </DialogContent>
         </Dialog>
       </div>
@@ -432,9 +561,8 @@ export const FormsPage = () => {
                       Perguntas ({(form.perguntas || []).length}):
                     </p>
                     <ul className="list-disc pl-5 text-sm text-muted-foreground">
-                      {/* CORRECTED: Use p.id and p.texto */}
                       {(form.perguntas || []).map((p) => (
-                        <li key={p.id}>{p.texto || 'Pergunta sem texto'}</li>
+                        <li key={p.id}>{p.texto || "Pergunta sem texto"}</li>
                       ))}
                     </ul>
                   </CardContent>

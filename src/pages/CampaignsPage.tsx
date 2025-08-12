@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "@/lib/api"; // Import the api instance
 import {
   useCampaign,
   Campanha,
@@ -17,6 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,11 +44,206 @@ import {
   Calendar as CalendarIcon,
   Search,
   Loader2,
+  Send,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+// --- INTERFACE PARA CLIENTE ---
+interface Cliente {
+  id: string;
+  nome: string;
+  // Adicione outros campos se necessário, ex: email
+}
+
+// --- COMPONENTE ATUALIZADO: MODAL DE ENVIO MANUAL ---
+const ManualSendModal = ({
+  isOpen,
+  onOpenChange,
+  campaign,
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  campaign: Campanha | null;
+}) => {
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const { toast } = useToast();
+
+  // Busca clientes da API quando o modal abre
+  useEffect(() => {
+    if (isOpen) {
+      const fetchClients = async () => {
+        setLoadingClients(true);
+        try {
+          const response = await api.get("/clientes"); // Assumindo que esta é a rota
+          setClientes(response.data);
+          console.log("Clientes carregados:", response.data);
+        } catch (error) {
+          console.error("Erro ao buscar clientes:", error);
+          toast({
+            title: "Erro",
+            description: "Não foi possível carregar a lista de clientes.",
+            variant: "destructive",
+          });
+        } finally {
+          setLoadingClients(false);
+        }
+      };
+      fetchClients();
+    } else {
+      // Limpa o estado quando o modal fecha
+      setSelectedClientIds([]);
+      setSearchTerm("");
+    }
+  }, [isOpen, toast]);
+
+  // <<< CORRIGIDO: Adicionada verificação para client.nome para evitar erros.
+  const filteredClients = useMemo(() => {
+    return clientes.filter((client) =>
+      (client.nome || "").toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [clientes, searchTerm]);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedClientIds(filteredClients.map((c) => c.id));
+    } else {
+      setSelectedClientIds([]);
+    }
+  };
+
+  const handleManualSend = async () => {
+    if (selectedClientIds.length === 0) {
+      toast({
+        title: "Nenhum cliente selecionado",
+        description: "Por favor, selecione ao menos um cliente para o envio.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!campaign) return;
+
+    const usuarioId = localStorage.getItem("usuarioId");
+    if (!usuarioId) {
+      toast({
+        title: "Erro de Autenticação",
+        description: "ID do usuário não encontrado. Faça login novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+    const sendPromises = selectedClientIds.map((clienteId) =>
+      api.post("/envio/individual", {
+        clienteId,
+        campanhaId: campaign.id,
+        usuarioId,
+      })
+    );
+
+    try {
+      await Promise.all(sendPromises);
+      toast({
+        title: "Envio Concluído!",
+        description: `Campanha "${
+          campaign.titulo
+        }" enviada para ${selectedClientIds.length} cliente(s).`,
+      });
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Erro no envio em massa:", error);
+      toast({
+        title: "Erro no Envio",
+        description: "Ocorreu um erro ao enviar a campanha para um ou mais clientes.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Envio Manual de Campanha</DialogTitle>
+          <DialogDescription>
+            Selecione os clientes para enviar a campanha{" "}
+            <span className="font-semibold text-primary">
+              "{campaign?.titulo}"
+            </span>.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4 space-y-4">
+          <Input
+            placeholder="Buscar cliente por nome..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="mb-4"
+          />
+          <div className="space-y-2 max-h-64 overflow-y-auto border rounded-md p-2">
+            {loadingClients ? (
+              <div className="flex justify-center items-center h-24">
+                <Loader2 className="animate-spin" />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center space-x-2 p-2">
+                  <Checkbox
+                    id="select-all"
+                    onCheckedChange={handleSelectAll}
+                    checked={
+                      filteredClients.length > 0 &&
+                      selectedClientIds.length === filteredClients.length
+                    }
+                  />
+                  <Label htmlFor="select-all" className="font-semibold">
+                    Selecionar Todos
+                  </Label>
+                </div>
+                {filteredClients.map((client) => (
+                  <div key={client.id} className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50">
+                    <Checkbox
+                      id={client.id}
+                      checked={selectedClientIds.includes(client.nome)}
+                      onCheckedChange={(checked) => {
+                        setSelectedClientIds((prev) =>
+                          checked
+                            ? [...prev, client.id]
+                            : prev.filter((id) => id !== client.id)
+                        );
+                      }}
+                    />
+                    <Label htmlFor={client.id} className="w-full cursor-pointer">
+                      {client.nome}
+                    </Label>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={handleManualSend} disabled={isSending}>
+            {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Enviar para ({selectedClientIds.length})
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 export const CampaignsPage = () => {
   const { campaigns, addCampaign, updateCampaign, deleteCampaign, loading } =
@@ -58,6 +255,11 @@ export const CampaignsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campanha | null>(null);
+
+  const [manualSendState, setManualSendState] = useState<{
+    isOpen: boolean;
+    campaign: Campanha | null;
+  }>({ isOpen: false, campaign: null });
 
   const [newCampaign, setNewCampaign] = useState<
     Omit<NewCampaignData, "formularioId">
@@ -78,8 +280,9 @@ export const CampaignsPage = () => {
     return Array.from(new Map(campaigns.map((c) => [c.id, c])).values());
   }, [campaigns]);
 
+  // <<< CORRIGIDO: Adicionada verificação para c.titulo para evitar erros.
   const filteredCampaigns = uniqueCampaigns.filter((c) =>
-    c.titulo.toLowerCase().includes(searchTerm.toLowerCase())
+    (c.titulo || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleOpenCreateModal = () => {
@@ -221,6 +424,18 @@ export const CampaignsPage = () => {
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setManualSendState({
+                            isOpen: true,
+                            campaign: campaign,
+                          })
+                        }
+                      >
+                        <Send className="w-3 h-3" />
+                      </Button>
                       {campaign.ativo ? (
                         <Button
                           size="sm"
@@ -288,7 +503,10 @@ export const CampaignsPage = () => {
                 id="description"
                 value={newCampaign.descricao}
                 onChange={(e) =>
-                  setNewCampaign({ ...newCampaign, descricao: e.target.value })
+                  setNewCampaign({
+                    ...newCampaign,
+                    descricao: e.target.value,
+                  })
                 }
               />
             </div>
@@ -464,7 +682,7 @@ export const CampaignsPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* <<< ATUALIZADO: Modal de Edição completo */}
+      {/* Modal de Edição */}
       {editingCampaign && (
         <Dialog
           open={!!editingCampaign}
@@ -656,6 +874,14 @@ export const CampaignsPage = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <ManualSendModal
+        isOpen={manualSendState.isOpen}
+        onOpenChange={(open) =>
+          setManualSendState({ isOpen: open, campaign: null })
+        }
+        campaign={manualSendState.campaign}
+      />
     </div>
   );
 };

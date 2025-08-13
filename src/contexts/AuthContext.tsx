@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.jsx
+// src/contexts/AuthContext.tsx
 
 import React, {
   createContext,
@@ -7,23 +7,19 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
+import api from "@/lib/api"; // sua instância axios configurada
 
-// Tipos (sem alterações)
 type User = {
-  username: string;
-  role: "admin" | "funcionario" | "master";
-  name: string;
+  nomeUsuario: string;
+  senha: string;
 };
 
-// ... (o resto dos seus tipos não precisa de alteração)
 type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
-  isAdmin: boolean;
-  isEmployee: boolean;
-  isMaster: boolean;
   login: (username: string, password: string) => Promise<void>;
+  register: (data: { nomeUsuario: string, nomeEmpresa: string, email: string, senha: string }) => Promise<void>;
   logout: () => void;
 };
 
@@ -33,58 +29,7 @@ type AuthProviderProps = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-
-// --- INÍCIO DA SIMULAÇÃO DE API ---
-
-// 1. Base de dados simulada (nosso objeto JSON)
-const mockUsers = [
-  {
-    username: "admin",
-    password: "admin123",
-    role: "admin", // Com 'as const', TypeScript entende isto como o tipo "admin" e não "string"
-    name: "Administrador do Sistema",
-  },
-  {
-    username: "funcionario",
-    password: "func123",
-    role: "funcionario",
-    name: "Colaborador Padrão",
-  },
-  {
-    username: "master",
-    password: "master123",
-    role: "master",
-    name: "Super Usuário",
-  },
-] as const; // A MUDANÇA ESTÁ AQUI 🚀
-
-// ... (o resto do ficheiro permanece exatamente igual)
-
-// 2. Função que simula a chamada à API
-const mockApiLogin = (username: string, password: string): Promise<{ user: User, token: string }> => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const foundUser = mockUsers.find(
-        (user) => user.username === username && user.password === password
-      );
-
-      if (foundUser) {
-        const { password, ...userToReturn } = foundUser;
-        resolve({
-          user: userToReturn, // Agora 'userToReturn' tem o tipo correto para 'role'
-          token: `mock-jwt-token-for-${username}`,
-        });
-      } else {
-        reject(new Error("Credenciais inválidas"));
-      }
-    }, 500);
-  });
-};
-
-// --- FIM DA SIMULAÇÃO DE API ---
-
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  // ... (Nenhuma alteração necessária aqui)
   const [user, setUser] = useState<User | null>(() => {
     const storedUser = localStorage.getItem("user");
     return storedUser ? JSON.parse(storedUser) : null;
@@ -96,12 +41,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const login = async (username: string, password: string) => {
-    const data = await mockApiLogin(username, password);
-    const loggedUser: User = data.user;
-    const token: string = data.token;
-    localStorage.setItem("user", JSON.stringify(loggedUser));
-    localStorage.setItem("authToken", token);
-    setUser(loggedUser);
+    try {
+      const response = await api.post("/login", { username, password });
+      const { user: loggedUser } = response.data;
+
+      localStorage.setItem("user", JSON.stringify(loggedUser));
+      setUser(loggedUser);
+    } catch (error) {
+      // Trate erros aqui, por ex:
+      throw new Error("Falha no login: " + (error as any).response?.data?.message || error.message);
+    }
+  };
+
+  const register = async (data: { nomeUsuario: string; senha: string; nomeEmpresa: string; }) => {
+    try {
+      const response = await api.post("/cadastro-empresa", data);
+      const { user: newUser } = response.data;
+
+      localStorage.setItem("user", JSON.stringify(newUser));
+      setUser(newUser);
+
+      window.location.href = "/login"; // Redireciona para a página de login após o registro
+    } catch (error) {
+      throw new Error("Falha no cadastro: " + (error as any).response?.data?.message || error.message);
+    }
   };
 
   const logout = () => {
@@ -116,10 +79,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         user,
         isAuthenticated: !!user,
         loading,
-        isAdmin: user?.role === "admin",
-        isEmployee: user?.role === "funcionario",
-        isMaster: user?.role === "master",
         login,
+        register,
         logout,
       }}
     >
@@ -128,9 +89,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   );
 };
 
-
 export const useAuth = (): AuthContextType => {
-  // ... (Nenhuma alteração necessária aqui)
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-// import { useAuth } from "../contexts/AuthContext"; // Removido por enquanto, já que o cadastro não usa o contexto de autenticação diretamente
+import { useAuth } from "../contexts/AuthContext"; // Importa o contexto com register
 
 export const Register = () => {
   const [nomeCompleto, setNomeCompleto] = useState("");
@@ -8,16 +8,19 @@ export const Register = () => {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [alerta, setAlerta] = useState<{ tipo: "success" | "danger"; mensagem: string } | null>(null);
+  const [alerta, setAlerta] = useState<{
+    tipo: "success" | "danger";
+    mensagem: string;
+  } | null>(null);
 
   const navigate = useNavigate();
-  // const { registerUser } = useAuth(); // Se houver uma função de registro no seu contexto de autenticação
+  const { register } = useAuth(); // Pega a função de registro do contexto
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAlerta(null);
 
-    // Validações dos campos
+    // Validações básicas
     if (!nomeCompleto.trim()) {
       setAlerta({ tipo: "danger", mensagem: "O campo Nome Completo é obrigatório." });
       return;
@@ -30,10 +33,6 @@ export const Register = () => {
       setAlerta({ tipo: "danger", mensagem: "O campo Usuário é obrigatório." });
       return;
     }
-    if (!password.trim()) {
-      setAlerta({ tipo: "danger", mensagem: "A Senha é obrigatória." });
-      return;
-    }
     if (password.length < 6) {
       setAlerta({ tipo: "danger", mensagem: "A Senha deve ter no mínimo 6 caracteres." });
       return;
@@ -44,24 +43,21 @@ export const Register = () => {
     }
 
     try {
-      // Aqui você faria a chamada para sua API de registro
-      // Exemplo: await registerUser(nomeCompleto, email, usuario, password);
+      // Usa a função register do contexto para chamar a API real
+      await register({
+        nomeUsuario: usuario,
+        senha: password,
+        nomeEmpresa: nomeCompleto,
+        email
+      });
 
-      // Simulação de registro bem-sucedido
-      console.log("Dados para registro:", { nomeCompleto, email, usuario, password });
-      setAlerta({ tipo: "success", mensagem: "Cadastro realizado com sucesso! Redirecionando para o login..." });
-      
-      // Redireciona para a tela de login após um pequeno atraso
+      setAlerta({ tipo: "success", mensagem: "Cadastro realizado com sucesso! Redirecionando..." });
+
       setTimeout(() => {
         navigate("/login", { replace: true });
       }, 2000);
-
-    } catch (error) {
-      // Erro real da API
-      // setAlerta({ tipo: "danger", mensagem: "Erro ao cadastrar. Tente novamente mais tarde." });
-      
-      // Simulação de erro (para testes)
-      setAlerta({ tipo: "danger", mensagem: "Erro ao cadastrar. Usuário ou e-mail já em uso." });
+    } catch (error: any) {
+      setAlerta({ tipo: "danger", mensagem: error.message || "Erro ao cadastrar. Tente novamente." });
     }
   };
 
@@ -70,35 +66,50 @@ export const Register = () => {
       <div className="w-full max-w-4xl bg-white shadow-xl rounded-xl p-6 md:flex md:gap-8">
         {/* Imagem */}
         <div className="hidden md:flex items-center justify-center">
-          <img src="./login.jpg" alt="Cadastro" className="w-[300px] h-[300px] object-cover rounded-md" />
+          <img
+            src="./login.jpg"
+            alt="Cadastro"
+            className="w-[300px] h-[300px] object-cover rounded-md"
+          />
         </div>
 
-        {/* Formulário de Cadastro */}
+        {/* Formulário */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 justify-center gap-4">
-          <h1 className="text-2xl font-bold text-center text-blue-800">Crie sua conta no FeedTrack</h1>
+          <h1 className="text-2xl font-bold text-center text-blue-800">
+            Crie sua conta no FeedTrack
+          </h1>
 
           {alerta && (
             <div
               className={`rounded-md px-4 py-3 text-sm font-medium flex justify-between items-center ${
-                alerta.tipo === "success"
-                  ? "bg-green-100 text-green-800"
-                  : "bg-red-100 text-red-800"
+                alerta.tipo === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
               }`}
             >
               <span>{alerta.mensagem}</span>
-              <button
-                type="button"
-                onClick={() => setAlerta(null)}
-                className="text-xl leading-none font-bold ml-2"
-              >
+              <button type="button" onClick={() => setAlerta(null)} className="text-xl font-bold ml-2">
                 ×
               </button>
             </div>
           )}
 
+          {/* Campos */}
+          <div>
+            <label htmlFor="nomeUsuario" className="block text-sm font-medium text-gray-700">
+              Nome de Usuario
+            </label>
+            <input
+              id="nomeUsuario"
+              type="text"
+              value={usuario}
+              onChange={(e) => setUsuario(e.target.value)}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
+            />
+          </div>
+
           <div>
             <label htmlFor="nomeCompleto" className="block text-sm font-medium text-gray-700">
-              Nome Completo
+              Nome da Empresa
             </label>
             <input
               id="nomeCompleto"
@@ -119,20 +130,6 @@ export const Register = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="usuario" className="block text-sm font-medium text-gray-700">
-              Usuário
-            </label>
-            <input
-              id="usuario"
-              type="text"
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
               required
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
             />

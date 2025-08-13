@@ -18,22 +18,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: "admin" | "manager" | "analyst";
-  status: "active" | "inactive";
-  lastLogin: string;
-}
 
-interface Integration {
-  id: number;
-  name: string;
-  type: string;
-  status: "connected" | "disconnected";
-  description: string;
-}
 
 export const SettingsPage = () => {
   const { toast } = useToast();
@@ -421,34 +406,6 @@ export const SettingsPage = () => {
                   onCheckedChange={setPushNotifications}
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Templates de Email</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="feedback-template">Template de Solicitação de Feedback</Label>
-                <Textarea
-                  id="feedback-template"
-                  placeholder="Olá {nome}, como foi sua experiência com {produto}?"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label htmlFor="thank-you-template">Template de Agradecimento</Label>
-                <Textarea
-                  id="thank-you-template"
-                  placeholder="Obrigado pelo seu feedback, {nome}!"
-                  rows={3}
-                />
-              </div>
-              <Button>
-                <Save className="w-4 h-4 mr-2" />
-                Salvar Templates
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>

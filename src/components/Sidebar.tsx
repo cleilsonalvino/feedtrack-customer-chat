@@ -2,6 +2,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BarChart3, Users, MessageSquare, Settings, FileBarChart, LogOut, Star, FolderKanban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+
 
 
 
@@ -25,11 +27,14 @@ const getNavigation = (isAdmin: boolean) => {
   return isAdmin ? adminNavigation : baseNavigation;
 };
 
+
+
 export const Sidebar = ({onClose}) => {
   const location = useLocation();
   const { isAdmin, isEmployee, user, logout } = useAuth();
    const navigate = useNavigate(); // 👈 necessário para redirecionar
   const navigation = getNavigation(isAdmin || user?.role === "master");
+  const [nomeEmpresa, setNomeEmpresa] = useState<string>();
 
     const handleLogout = () => {
     logout();        // limpa o estado do usuário
@@ -37,15 +42,22 @@ export const Sidebar = ({onClose}) => {
     navigate("/login"); // 👈 redireciona corretamente para tela de login
   };
 
+  useEffect(() => {
+    const nome = localStorage.getItem("nomeEmpresa")
+
+
+    setNomeEmpresa(nome);
+  }, []);
+
   return (
     <div className="w-64 bg-card border-r h-screen sticky top-0 flex flex-col">
       <div className="p-6 border-b ">
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-start gap-2">
           <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
             <BarChart3 className="w-5 h-5 text-primary-foreground" />
           </div>
           <h1 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            FeedTrack
+            {nomeEmpresa}
           </h1>
         </div>
       </div>

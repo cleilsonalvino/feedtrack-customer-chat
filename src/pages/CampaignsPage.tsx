@@ -55,8 +55,12 @@ import { ptBR } from "date-fns/locale";
 // --- INTERFACE PARA CLIENTE ---
 interface Cliente {
   id: string;
-  nome: string;
-  // Adicione outros campos se necessário, ex: email
+  cidade: string;
+  pessoa: {
+    nome: string;
+    email: string;
+    telefone: string;
+  };
 }
 
 // --- COMPONENTE ATUALIZADO: MODAL DE ENVIO MANUAL ---
@@ -107,7 +111,9 @@ const ManualSendModal = ({
   // <<< CORRIGIDO: Adicionada verificação para client.nome para evitar erros.
   const filteredClients = useMemo(() => {
     return clientes.filter((client) =>
-      (client.nome || "").toLowerCase().includes(searchTerm.toLowerCase())
+      (client.pessoa.nome || "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase())
     );
   }, [clientes, searchTerm]);
 
@@ -129,8 +135,10 @@ const ManualSendModal = ({
       return;
     }
     if (!campaign) return;
+    const userData = localStorage.getItem("user");
+    const usuarioId = userData ? JSON.parse(userData).usuario.id : null;
+    console.log(usuarioId)
 
-    const usuarioId = localStorage.getItem("usuarioId");
     if (!usuarioId) {
       toast({
         title: "Erro de Autenticação",
@@ -139,6 +147,8 @@ const ManualSendModal = ({
       });
       return;
     }
+
+    console.log("[teste]",campaign.id)
 
     setIsSending(true);
     const sendPromises = selectedClientIds.map((clienteId) =>
@@ -153,16 +163,15 @@ const ManualSendModal = ({
       await Promise.all(sendPromises);
       toast({
         title: "Envio Concluído!",
-        description: `Campanha "${
-          campaign.titulo
-        }" enviada para ${selectedClientIds.length} cliente(s).`,
+        description: `Campanha "${campaign.titulo}" enviada para ${selectedClientIds.length} cliente(s).`,
       });
       onOpenChange(false);
     } catch (error) {
       console.error("Erro no envio em massa:", error);
       toast({
         title: "Erro no Envio",
-        description: "Ocorreu um erro ao enviar a campanha para um ou mais clientes.",
+        description:
+          "Ocorreu um erro ao enviar a campanha para um ou mais clientes.",
         variant: "destructive",
       });
     } finally {
@@ -179,7 +188,8 @@ const ManualSendModal = ({
             Selecione os clientes para enviar a campanha{" "}
             <span className="font-semibold text-primary">
               "{campaign?.titulo}"
-            </span>.
+            </span>
+            .
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
@@ -210,10 +220,13 @@ const ManualSendModal = ({
                   </Label>
                 </div>
                 {filteredClients.map((client) => (
-                  <div key={client.id} className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50">
+                  <div
+                    key={client.id}
+                    className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50"
+                  >
                     <Checkbox
                       id={client.id}
-                      checked={selectedClientIds.includes(client.nome)}
+                      checked={selectedClientIds.includes(client.id)}
                       onCheckedChange={(checked) => {
                         setSelectedClientIds((prev) =>
                           checked
@@ -222,8 +235,11 @@ const ManualSendModal = ({
                         );
                       }}
                     />
-                    <Label htmlFor={client.id} className="w-full cursor-pointer">
-                      {client.nome}
+                    <Label
+                      htmlFor={client.id}
+                      className="w-full cursor-pointer"
+                    >
+                      {client.pessoa.nome}
                     </Label>
                   </div>
                 ))}
@@ -362,8 +378,8 @@ export const CampaignsPage = () => {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-8">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 p-4 md:p-8 mt-8">
+      <div className="flex justify-between items-center flex-wrap">
         <div>
           <h1 className="text-3xl font-bold">Gestão de Campanhas</h1>
           <p className="text-muted-foreground">
@@ -402,8 +418,8 @@ export const CampaignsPage = () => {
                   key={campaign.id}
                   className="border rounded-lg p-4 hover:bg-muted/50"
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
+                  <div className="flex items-start justify-between flex-wrap">
+                    <div className="">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="font-semibold text-lg">
                           {campaign.titulo}
@@ -413,7 +429,7 @@ export const CampaignsPage = () => {
                       <p className="text-sm text-muted-foreground mb-2">
                         {campaign.descricao}
                       </p>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap mb-2">
                         <span>Tipo: {campaign.tipoCampanha}</span>
                         <span>Segmento: {campaign.segmentoAlvo}</span>
                         <span>
@@ -423,7 +439,7 @@ export const CampaignsPage = () => {
                         </span>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         size="sm"
                         variant="outline"

@@ -50,15 +50,15 @@ export type IFormulario = {
 };
 
 export type IFuncionario = {
-  _id: string;
-  _usuarioId: string;
-  _cargo: string;
+  id: string;
+  usuarioId: string;
+  cargo: string;
   telefone?: string;
 };
 
 export type Usuario = {
-  _id: string;
-  _nomeUsuario: string;
+  id: string;
+  nomeUsuario: string;
   // outros campos que precisar
 };
 
@@ -72,7 +72,7 @@ async function fetchUsuarioPorId(id: string): Promise<Usuario | null> {
   }
 }
 
-export type FuncionarioComNome = IFuncionario & { _nomeUsuario?: string };
+export type FuncionarioComNome = IFuncionario & { nomeUsuario?: string };
 
 async function fetchFuncionariosComNomeApi(): Promise<FuncionarioComNome[]> {
   try {
@@ -82,10 +82,10 @@ async function fetchFuncionariosComNomeApi(): Promise<FuncionarioComNome[]> {
 
     const funcionariosComNome = await Promise.all(
       funcionarios.map(async (func) => {
-        const usuario = await fetchUsuarioPorId(func._usuarioId);
+        const usuario = await fetchUsuarioPorId(func.usuarioId);
         return {
           ...func,
-          _nomeUsuario: usuario?._nomeUsuario || "Nome não encontrado",
+          nomeUsuario: usuario?.nomeUsuario || "Nome não encontrado",
         };
       })
     );

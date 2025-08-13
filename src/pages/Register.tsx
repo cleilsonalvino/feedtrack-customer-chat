@@ -54,7 +54,7 @@ export const Register = () => {
       setAlerta({ tipo: "success", mensagem: "Cadastro realizado com sucesso! Redirecionando..." });
 
       setTimeout(() => {
-        navigate("/login", { replace: true });
+        navigate("/onboarding", { replace: true });
       }, 2000);
     } catch (error: any) {
       setAlerta({ tipo: "danger", mensagem: error.message || "Erro ao cadastrar. Tente novamente." });

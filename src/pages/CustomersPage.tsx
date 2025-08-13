@@ -217,15 +217,15 @@ export const CustomersPage = () => {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
+    <div className="p-4 md:p-8 space-y-6 mt-10">
+      <div className="flex flex-col ">
+        <div className="flex">
           <h1 className="text-3xl font-bold">Gestão de Clientes</h1>
-          <p className="text-muted-foreground">
+          <p className="m-2 text-muted-foreground">
             Cadastre e gerencie seus clientes
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex justify-between items-center gap-2 flex-wrap">
           <Button
             variant="outline"
             onClick={() => setIsInactiveModalOpen(true)}
@@ -400,8 +400,8 @@ export const CustomersPage = () => {
                           {customer.status}
                         </Badge>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
+                      <div className="gap-x-4 gap-y-2 text-sm text-muted-foreground flex flex-wrap">
+                        <div className="flex items-center gap-2 ">
                           <Mail className="w-4 h-4" />
                           {customer.pessoa.email}
                         </div>
@@ -419,7 +419,7 @@ export const CustomersPage = () => {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap justify-end">
                       <Button
                         variant="outline"
                         size="icon"

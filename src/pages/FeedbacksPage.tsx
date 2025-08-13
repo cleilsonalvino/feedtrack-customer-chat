@@ -254,7 +254,7 @@ useEffect(() => {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-8">
+    <div className="p-4 md:p-8 space-y-8 mt-10">
       <h1 className="text-3xl font-bold">Gestão de Feedbacks</h1>
       <Card>
         <CardHeader>
@@ -385,8 +385,8 @@ useEffect(() => {
 <Select
   onValueChange={(id) => {
     setSelectedFuncionarioId(id);
-    const func = funcionarios.find(f => f._id === id);
-    setEmployeeName(func?._nomeUsuario || "");
+    const func = funcionarios.find(f => f.id === id);
+    setEmployeeName(func?.nomeUsuario || "");
   }}
   value={selectedFuncionarioId}
   disabled={funcionarios.length === 0}
@@ -400,8 +400,8 @@ useEffect(() => {
 
     ) : (
       funcionarios.map((func) => (
-        <SelectItem key={func._id} value={func._id}>
-          {func._nomeUsuario || "Nome não encontrado"}
+        <SelectItem key={func.id} value={func.id}>
+          {func.nomeUsuario || "Nome não encontrado"}
         </SelectItem>
       ))
     )}

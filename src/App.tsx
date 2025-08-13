@@ -10,7 +10,7 @@ import Index from "./pages/Index";
 import { CustomersPage } from "./pages/CustomersPage";
 import { CampaignsPage } from "./pages/CampaignsPage";
 import { ReportsPage } from "./pages/ReportsPage";
-import { SettingsPage } from "./pages/SettingsPage";
+// import { SettingsPage } from "./pages/SettingsPage";
 import { FeedbacksPage } from "./pages/FeedbacksPage"; // 👈 1. IMPORTA A NOVA PÁGINA
 import NotFound from "./pages/NotFound";
 import { Login } from "./pages/Login";
@@ -25,8 +25,9 @@ import { FormsPage } from "./pages/FormsPage";
 import { CampaignProvider } from "./contexts/CampaignContext";
 import { FeedBackProvider } from "./contexts/FeedBackContext";
 import { ReportsProvider } from "./contexts/RepostsContext"; // 👈 3. IMPORTA O PROVIDER
+import OnboardingPage from "./pages/OnboardingPage";
 
-const allFeedbacks = []
+const allFeedbacks = [];
 
 const queryClient = new QueryClient();
 
@@ -38,35 +39,53 @@ const App = () => (
           <FormProvider>
             <CampaignProvider>
               <FeedBackProvider>
-                <ReportsProvider allFeedbacks={allFeedbacks}> {/* 👈 4. ENVOLVE A APLICAÇÃO COM O PROVIDER */}
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <Routes>
-                  {/* 🔓 Rotas públicas */}
-                  <Route path="/" element={<LandingPage />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/recuperar-senha" element={<RecuperarSenha />} />
-                  
-                  {/* 🔐 Rota de avaliação com query params */}
+                <ReportsProvider allFeedbacks={allFeedbacks}>
+                  {" "}
+                  {/* 👈 4. ENVOLVE A APLICAÇÃO COM O PROVIDER */}
+                  <TooltipProvider>
+                    <Toaster />
+                    <Sonner />
+                    <BrowserRouter>
+                      <Routes>
+                        {/* 🔓 Rotas públicas */}
+                        <Route path="/" element={<LandingPage />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route
+                          path="/recuperar-senha"
+                          element={<RecuperarSenha />}
+                        />
+                        <Route
+                          path="/onboarding"
+                          element={<OnboardingPage />}
+                        />
 
-                  {/* 🔐 Rotas com layout e sidebar */}
-                  <Route element={<SidebarWrapper />}>
-                    <Route path="/home" element={<Index />} />
-                    <Route path="/customers" element={<CustomersPage />} />
-                    <Route path="/campaigns" element={<CampaignsPage />} />
-                    <Route path="/feedbacks" element={<FeedbacksPage />} />
-                    <Route path="/form-builder" element={<FormsPage />} />
-                    <Route path="/products" element={<ProductsPage />} />
-                    <Route path="/reports" element={<ReportsPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Route>
-                </Routes>
-              </BrowserRouter>
-            </TooltipProvider>
+                        {/* 🔐 Rota de avaliação com query params */}
+
+                        {/* 🔐 Rotas com layout e sidebar */}
+                        <Route element={<SidebarWrapper />}>
+                          <Route path="/home" element={<Index />} />
+                          <Route
+                            path="/customers"
+                            element={<CustomersPage />}
+                          />
+                          <Route
+                            path="/campaigns"
+                            element={<CampaignsPage />}
+                          />
+                          <Route
+                            path="/feedbacks"
+                            element={<FeedbacksPage />}
+                          />
+                          <Route path="/form-builder" element={<FormsPage />} />
+                          <Route path="/products" element={<ProductsPage />} />
+                          <Route path="/reports" element={<ReportsPage />} />
+                          {/* <Route path="/settings" element={<SettingsPage />} /> */}
+                          <Route path="*" element={<NotFound />} />
+                        </Route>
+                      </Routes>
+                    </BrowserRouter>
+                  </TooltipProvider>
                 </ReportsProvider>
               </FeedBackProvider>
             </CampaignProvider>

@@ -133,24 +133,29 @@ export const ReportsProvider = ({
     // Calcula as métricas principais
     const totalFeedbacks = filteredFeedbacks.length;
     const sumOfRatings = filteredFeedbacks.reduce(
-      (sum, fb) => sum + fb._respostas.nota,
+      (sum, fb) => sum + (fb._respostas.nota || 0),
       0
     );
+
     const averageRating =
       totalFeedbacks > 0
         ? parseFloat((sumOfRatings / totalFeedbacks).toFixed(1))
         : 0;
 
     // Calcula a análise de sentimento
-    const positiveCount = filteredFeedbacks.filter(
-      (fb) => fb._respostas.nota >= 4
-    ).length;
-    const neutralCount = filteredFeedbacks.filter(
-      (fb) => fb._respostas.nota === 3
-    ).length;
-    const negativeCount = filteredFeedbacks.filter(
-      (fb) => fb._respostas.nota < 3
-    ).length;
+const positiveCount = filteredFeedbacks.filter(
+  (fb) => (fb._respostas?.nota ?? 0) >= 4
+).length;
+
+const neutralCount = filteredFeedbacks.filter(
+  (fb) => (fb._respostas?.nota ?? 0) === 3
+).length;
+
+const negativeCount = filteredFeedbacks.filter(
+  (fb) => (fb._respostas?.nota ?? 0) < 3
+).length;
+
+
     const sentiment = {
       positive:
         totalFeedbacks > 0
@@ -178,13 +183,14 @@ export const ReportsProvider = ({
       return acc;
     }, {} as Record<string, { name: string; feedbacks: number; totalRating: number }>);
 
-    const topProducts = Object.values(productGroups)
-      .map((p) => ({
-        ...p,
-        rating: parseFloat((p.totalRating / p.feedbacks).toFixed(1)),
-      }))
-      .sort((a, b) => b.feedbacks - a.feedbacks)
-      .slice(0, 5);
+const topProducts = Object.values(productGroups)
+  .map((p) => ({
+    ...p,
+    rating: parseFloat((p.totalRating / p.feedbacks).toFixed(1)),
+  }))
+  .sort((a, b) => b.rating - a.rating)
+  .slice(0, 5);
+
 
     // Calcula dados mensais (para o gráfico de evolução)
     const monthlyGroups = filteredFeedbacks.reduce((acc, fb) => {

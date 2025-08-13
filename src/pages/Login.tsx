@@ -4,23 +4,23 @@ import { useAuth } from "../contexts/AuthContext";
 
 export const Login = () => {
   const [usuario, setUsuario] = useState("");
-  const [password, setPassword] = useState("");
+  const [senha, setSenha] = useState("");
   const [alerta, setAlerta] = useState<{ tipo: "success" | "danger"; mensagem: string } | null>(null);
+  const [loginSucesso, setLoginSucesso] = useState(false);
 
-  const { login, isAuthenticated, isAdmin, isEmployee, isMaster } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated) {
-      if (isAdmin || isEmployee) {
-        navigate("/home", { replace: true });
-      } else if (isMaster) {
-        navigate("/master", { replace: true });
-      }
-    }
-  }, [isAuthenticated, isAdmin, isEmployee, isMaster, navigate]);
+    if (loginSucesso) {
+      const timer = setTimeout(() => {
+        navigate("/home"); // Ajuste para sua rota principal
+      }, 1500);
 
-  // A função agora é 'async' para poder usar 'await'
+      return () => clearTimeout(timer);
+    }
+  }, [loginSucesso, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAlerta(null);
@@ -29,22 +29,17 @@ export const Login = () => {
       setAlerta({ tipo: "danger", mensagem: "O campo Usuário é obrigatório." });
       return;
     }
-    if (!password.trim()) {
+    if (!senha.trim()) {
       setAlerta({ tipo: "danger", mensagem: "A Senha é obrigatória." });
       return;
     }
 
-    // Usamos um bloco 'try...catch' para lidar com sucesso e erro da API
     try {
-      // 1. 'await' faz com que o código espere a função 'login' terminar
-      await login(usuario, password);
-
-      // 2. Se a linha de cima não der erro, o login foi um sucesso!
+      await login(usuario, senha);
       setAlerta({ tipo: "success", mensagem: "Login realizado com sucesso! Redirecionando..." });
-      // O useEffect acima cuidará do redirecionamento automático.
-
+      setLoginSucesso(true);
+      
     } catch (error) {
-      // 3. Se 'login' lançar um erro (ex: senha errada), ele é capturado aqui.
       setAlerta({ tipo: "danger", mensagem: "Credenciais inválidas. Verifique seu usuário e senha." });
     }
   };
@@ -101,8 +96,8 @@ export const Login = () => {
             <input
               id="password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
               required
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
             />

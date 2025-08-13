@@ -31,10 +31,12 @@ const getNavigation = (isAdmin: boolean) => {
 
 export const Sidebar = ({onClose}) => {
   const location = useLocation();
-  const { isAdmin, isEmployee, user, logout } = useAuth();
+  const { user, logout } = useAuth();
    const navigate = useNavigate(); // 👈 necessário para redirecionar
-  const navigation = getNavigation(isAdmin || user?.role === "master");
+
   const [nomeEmpresa, setNomeEmpresa] = useState<string>();
+  const [tipoUsuario, setTipoUsuario] =  useState<string>();
+  const navigation = getNavigation(tipoUsuario === "EMPRESA" || user?.tipo === "usuario");
 
     const handleLogout = () => {
     logout();        // limpa o estado do usuário
@@ -43,10 +45,13 @@ export const Sidebar = ({onClose}) => {
   };
 
   useEffect(() => {
-    const nome = localStorage.getItem("nomeEmpresa")
+const userString = localStorage.getItem("user");
+if (userString) {
+  const user = JSON.parse(userString);
+  setTipoUsuario(user.usuario.tipo)
+  setNomeEmpresa(user.usuario.nomeEmpresa);
+}
 
-
-    setNomeEmpresa(nome);
   }, []);
 
   return (
@@ -64,9 +69,7 @@ export const Sidebar = ({onClose}) => {
 
       <nav className="flex-1 p-4">
         <div className="mb-4 px-3 py-2 bg-muted/50 rounded-lg">
-          <p className="text-xs text-muted-foreground">Logado como:</p>
-          <p className="text-sm font-medium">{user?.name}</p>
-          <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+          <p className="text-xs text-muted-foreground">Logado como: {tipoUsuario}</p>
         </div>
         
         <ul className="space-y-2">

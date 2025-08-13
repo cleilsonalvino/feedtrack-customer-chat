@@ -48,8 +48,8 @@ const ReportsContent = () => {
 
   const handleExportReport = (format: string) => {
     toast({
-      title: "Relatório exportado",
-      description: `Relatório foi exportado em formato ${format.toUpperCase()}`
+      title: "Funcionalidade não implementada",
+      description: `em breve`
     });
     // Aqui você pode adicionar a lógica real de exportação usando os dados filtrados
   };
@@ -220,7 +220,7 @@ const ReportsContent = () => {
                   </div>
                   <div className="flex items-center gap-1 ml-4">
                     <Star className="w-4 h-4 text-warning fill-current" />
-                    <span className="text-sm font-medium">{data.rating}</span>
+                    <span className="text-sm font-medium">{data.feedbacks}</span>
                   </div>
                 </div>
               ))}
@@ -280,7 +280,7 @@ const ReportsContent = () => {
                 </div>
                 <div className="flex items-center gap-1">
                   <Star className="w-4 h-4 text-warning fill-current" />
-                  <span className="font-medium">{product.rating}</span>
+                  <span className="font-medium">{product.feedbacks}</span>
                 </div>
               </div>
             ))}
@@ -293,7 +293,7 @@ const ReportsContent = () => {
 
 // Componente principal que gerencia o estado de carregamento e permissões
 export const ReportsPage = () => {
-  const { isAdmin, user } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -301,9 +301,7 @@ export const ReportsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAdmin && user?.role !== "master") {
-      navigate("/");
-    }
+
 
     const fetchFeedbacks = async () => {
       try {
@@ -322,24 +320,10 @@ export const ReportsPage = () => {
       }
     };
 
-    if (isAdmin || user?.role === "master") {
-        fetchFeedbacks();
-    }
-  }, [isAdmin, user, navigate, toast]);
+    fetchFeedbacks();
 
-  if (!isAdmin && user?.role !== "master") {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <CardTitle>Acesso Restrito</CardTitle>
-            <p className="text-muted-foreground">Esta página é exclusiva para administradores.</p>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
+  }, [ user, navigate, toast]);
+
 
   if (isLoading) {
     return (

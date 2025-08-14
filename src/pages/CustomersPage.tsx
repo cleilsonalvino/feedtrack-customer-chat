@@ -1,17 +1,15 @@
 // src/pages/CustomersPage.tsx
 
 import React, { useState, useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import {
   useCustomer,
   Customer,
   NewCustomerData,
-} from "@/contexts/CustomerContext";
-import { useProduct, Product } from "@/contexts/ProductContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+} from "../contexts/CustomerContext";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Badge } from "../components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -19,16 +17,8 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+} from "../components/ui/dialog";
+import { Label } from "../components/ui/label";
 import {
   Search,
   Plus,
@@ -40,55 +30,35 @@ import {
   Loader2,
   Eye,
   RotateCcw,
-  PackagePlus,
-  List,
-  Replace,
-  User,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "../hooks/use-toast";
 
 export const CustomersPage = () => {
-  // <<< CORRIGIDO: Usando a nova função `manageProductAssociation`
+  // Use the customer context to manage customer data
   const {
     customers,
     addCustomer,
     updateCustomer,
     deleteCustomer,
-    manageCustomerProducts, 
     loading,
   } = useCustomer();
-  const { products: availableProducts } = useProduct();
-  const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
 
+  // State for managing UI interactions
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isInactiveModalOpen, setIsInactiveModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [addingProductsToCustomer, setAddingProductsToCustomer] =
-    useState<Customer | null>(null);
-  const [viewingCustomerProducts, setViewingCustomerProducts] =
-    useState<Customer | null>(null);
-  const [replacingProduct, setReplacingProduct] = useState<{
-    customer: Customer;
-    oldProductId: string;
-  } | null>(null);
 
-  const [newCustomerData, setNewCustomerData] = useState<
-    Omit<NewCustomerData, "idsProdutos">
-  >({
-    pessoa: { nome: "", email: "", telefone: "" },
+  // State for the new customer form, matching the updated NewCustomerData type
+  const [newCustomerData, setNewCustomerData] = useState<NewCustomerData>({
+    nome: "",
+    email: "",
+    telefone: "",
     cidade: "",
-    vendedorResponsavel: "",
   });
-  const [initialSelectedProductId, setInitialSelectedProductId] = useState<
-    string | null
-  >(null);
-  const [newlySelectedProducts, setNewlySelectedProducts] = useState<string[]>(
-    []
-  );
 
+  // Memoized separation of active and inactive customers for performance
   const { activeCustomers, inactiveCustomers } = useMemo(() => {
     const active: Customer[] = [];
     const inactive: Customer[] = [];
@@ -98,49 +68,47 @@ export const CustomersPage = () => {
     return { activeCustomers: active, inactiveCustomers: inactive };
   }, [customers]);
 
+  // Memoized filtering of customers based on the search term
   const filteredCustomers = useMemo(
     () =>
       activeCustomers.filter(
         (customer) =>
-          (customer.pessoa.nome || "")
+          (customer.nome || "")
             .toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
-          (customer.pessoa.email || "")
+          (customer.email || "")
             .toLowerCase()
             .includes(searchTerm.toLowerCase())
       ),
     [activeCustomers, searchTerm]
   );
 
+  // Handler to add a new customer
   const handleAddCustomer = async () => {
-    if (
-      !newCustomerData.pessoa.nome ||
-      !newCustomerData.pessoa.email ||
-      !initialSelectedProductId
-    ) {
+    // Validation using the new flat structure
+    if (!newCustomerData.nome || !newCustomerData.email) {
       toast({
         title: "Erro de Validação",
-        description: "Nome, email e um produto inicial são obrigatórios.",
+        description: "Nome e email são obrigatórios.",
         variant: "destructive",
       });
       return;
     }
-    const payload: NewCustomerData = {
-      ...newCustomerData,
-      idsProdutos: [initialSelectedProductId],
-    };
-    const createdCustomer = await addCustomer(payload);
+    // The context handles adding 'empresaId' and structuring the final payload
+    const createdCustomer = await addCustomer(newCustomerData);
     if (createdCustomer) {
+      // Reset form with the new flat structure and close dialog on success
       setNewCustomerData({
-        pessoa: { nome: "", email: "", telefone: "" },
+        nome: "",
+        email: "",
+        telefone: "",
         cidade: "",
-        vendedorResponsavel: "",
       });
-      setInitialSelectedProductId(null);
       setIsAddDialogOpen(false);
     }
   };
 
+  // Handler to save edits to an existing customer
   const handleSaveEdit = async () => {
     if (!editingCustomer) return;
     try {
@@ -148,84 +116,46 @@ export const CustomersPage = () => {
       setEditingCustomer(null);
       toast({ title: "Sucesso!", description: "Cliente atualizado." });
     } catch (error) {
-      // O erro já é tratado no contexto
+      // Error is already handled and toasted in the context
     }
   };
 
+  // Handler to deactivate a customer (soft delete)
   const handleDeleteCustomer = async (id: string) => {
+    // A confirmation dialog is a good practice before destructive actions
     if (window.confirm("Tem certeza que deseja desativar este cliente?")) {
       await deleteCustomer(id);
     }
   };
 
+  // Handler to reactivate an inactive customer
   const handleReactivateCustomer = async (customer: Customer) => {
-    const customerToReactivate = { ...customer, status: "ATIVO" };
+    const customerToReactivate = { ...customer, status: "ATIVO" as const };
     try {
       await updateCustomer(customerToReactivate);
       toast({
         title: "Sucesso!",
-        description: `Cliente "${customer.pessoa.nome}" foi reativado.`,
+        description: `Cliente "${customer.nome}" foi reativado.`,
       });
-    } catch (error) {
-      // O erro já é tratado no contexto
-    }
-  };
-
-  const handleSaveNewProducts = async () => {
-    if (!addingProductsToCustomer || newlySelectedProducts.length === 0) return;
-    try {
-      await manageCustomerProducts(addingProductsToCustomer.id, {
-        idsProdutosParaAdicionar: newlySelectedProducts,
-      });
-      setAddingProductsToCustomer(null);
-      setNewlySelectedProducts([]);
-      // O toast de sucesso já está na função do contexto
-    } catch (error) {
-      // O erro já é tratado no contexto
-    }
-  };
-
-
-  const handleRemoveProduct = async (customer: Customer, productId: string) => {
-    if (
-      window.confirm("Tem certeza que deseja remover este produto do cliente?")
-    ) {
-      try {
-        await manageCustomerProducts(customer.id, {
-          idsProdutosParaRemover: [productId],
-        });
-        // Fecha o modal. A atualização dos dados é feita pelo fetch no contexto.
-        setViewingCustomerProducts(null);
-      } catch (error) {
-        // O erro já é tratado no contexto
+      // Close the inactive modal if it's the last one
+      if (inactiveCustomers.length === 1) {
+        setIsInactiveModalOpen(false);
       }
-    }
-  };
-
-  const handleReplaceProduct = async (newProductId: string) => {
-    if (!replacingProduct) return;
-    try {
-      await manageCustomerProducts(replacingProduct.customer.id, {
-        idsProdutosParaAdicionar: [newProductId],
-        idsProdutosParaRemover: [replacingProduct.oldProductId],
-      });
-      setReplacingProduct(null);
-      setViewingCustomerProducts(null); // Fecha ambos os modais
     } catch (error) {
-      // O erro já é tratado no contexto
+      // Error is already handled and toasted in the context
     }
   };
 
   return (
     <div className="p-4 md:p-8 space-y-6 mt-10">
       <div className="flex flex-col ">
-        <div className="flex">
+        <div className="flex items-baseline">
           <h1 className="text-3xl font-bold">Gestão de Clientes</h1>
-          <p className="m-2 text-muted-foreground">
+          <p className="ml-4 text-muted-foreground">
             Cadastre e gerencie seus clientes
           </p>
         </div>
-        <div className="flex justify-between items-center gap-2 flex-wrap">
+        <div className="flex justify-between items-center gap-2 flex-wrap mt-4">
           <Button
             variant="outline"
             onClick={() => setIsInactiveModalOpen(true)}
@@ -252,11 +182,11 @@ export const CustomersPage = () => {
                   <Label htmlFor="nome">Nome *</Label>
                   <Input
                     id="nome"
-                    value={newCustomerData.pessoa.nome}
+                    value={newCustomerData.nome}
                     onChange={(e) =>
                       setNewCustomerData((prev) => ({
                         ...prev,
-                        pessoa: { ...prev.pessoa, nome: e.target.value },
+                        nome: e.target.value,
                       }))
                     }
                   />
@@ -266,11 +196,11 @@ export const CustomersPage = () => {
                   <Input
                     id="email"
                     type="email"
-                    value={newCustomerData.pessoa.email}
+                    value={newCustomerData.email}
                     onChange={(e) =>
                       setNewCustomerData((prev) => ({
                         ...prev,
-                        pessoa: { ...prev.pessoa, email: e.target.value },
+                        email: e.target.value,
                       }))
                     }
                   />
@@ -279,11 +209,11 @@ export const CustomersPage = () => {
                   <Label htmlFor="telefone">Telefone</Label>
                   <Input
                     id="telefone"
-                    value={newCustomerData.pessoa.telefone}
+                    value={newCustomerData.telefone}
                     onChange={(e) =>
                       setNewCustomerData((prev) => ({
                         ...prev,
-                        pessoa: { ...prev.pessoa, telefone: e.target.value },
+                        telefone: e.target.value,
                       }))
                     }
                   />
@@ -300,40 +230,6 @@ export const CustomersPage = () => {
                       }))
                     }
                   />
-                </div>
-                <div>
-                  <Label htmlFor="vendedor">Vendedor Responsável</Label>
-                  <Input
-                    id="vendedor"
-                    value={newCustomerData.vendedorResponsavel}
-                    onChange={(e) =>
-                      setNewCustomerData((prev) => ({
-                        ...prev,
-                        vendedorResponsavel: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="produtos">Produto Inicial *</Label>
-                  <Select
-                    onValueChange={(value) =>
-                      setInitialSelectedProductId(value)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um produto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableProducts
-                        .filter((p) => p.ativo)
-                        .map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.nome}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
                 </div>
                 <div className="flex justify-end gap-2 pt-4">
                   <Button
@@ -388,7 +284,7 @@ export const CustomersPage = () => {
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="font-semibold text-lg">
-                          {customer.pessoa.nome}
+                          {customer.nome}
                         </h3>
                         <Badge
                           variant={
@@ -403,39 +299,19 @@ export const CustomersPage = () => {
                       <div className="gap-x-4 gap-y-2 text-sm text-muted-foreground flex flex-wrap">
                         <div className="flex items-center gap-2 ">
                           <Mail className="w-4 h-4" />
-                          {customer.pessoa.email}
+                          {customer.email}
                         </div>
                         <div className="flex items-center gap-2">
                           <Phone className="w-4 h-4" />
-                          {customer.pessoa.telefone || "Não informado"}
+                          {customer.telefone || "Não informado"}
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4" />
                           {customer.cidade || "Não informado"}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4" />
-                          {customer.vendedorResponsavel || "Não informado"}
-                        </div>
                       </div>
                     </div>
                     <div className="flex gap-2 flex-wrap justify-end">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        title="Ver Produtos"
-                        onClick={() => setViewingCustomerProducts(customer)}
-                      >
-                        <List className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        title="Adicionar Produtos"
-                        onClick={() => setAddingProductsToCustomer(customer)}
-                      >
-                        <PackagePlus className="w-4 h-4" />
-                      </Button>
                       <Button
                         variant="outline"
                         size="icon"
@@ -466,6 +342,7 @@ export const CustomersPage = () => {
         </CardContent>
       </Card>
 
+      {/* Edit Customer Dialog */}
       {editingCustomer && (
         <Dialog
           open={!!editingCustomer}
@@ -482,13 +359,13 @@ export const CustomersPage = () => {
               <div>
                 <Label>Nome</Label>
                 <Input
-                  value={editingCustomer.pessoa.nome}
+                  value={editingCustomer.nome}
                   onChange={(e) =>
                     setEditingCustomer((prev) =>
                       prev
                         ? {
                             ...prev,
-                            pessoa: { ...prev.pessoa, nome: e.target.value },
+                             nome: e.target.value 
                           }
                         : null
                     )
@@ -499,13 +376,13 @@ export const CustomersPage = () => {
                 <Label>Email</Label>
                 <Input
                   type="email"
-                  value={editingCustomer.pessoa.email}
+                  value={editingCustomer.email}
                   onChange={(e) =>
                     setEditingCustomer((prev) =>
                       prev
                         ? {
                             ...prev,
-                            pessoa: { ...prev.pessoa, email: e.target.value },
+                            email: e.target.value,
                           }
                         : null
                     )
@@ -515,16 +392,13 @@ export const CustomersPage = () => {
               <div>
                 <Label>Telefone</Label>
                 <Input
-                  value={editingCustomer.pessoa.telefone}
+                  value={editingCustomer.telefone}
                   onChange={(e) =>
                     setEditingCustomer((prev) =>
                       prev
                         ? {
                             ...prev,
-                            pessoa: {
-                              ...prev.pessoa,
                               telefone: e.target.value,
-                            },
                           }
                         : null
                     )
@@ -538,19 +412,6 @@ export const CustomersPage = () => {
                   onChange={(e) =>
                     setEditingCustomer((prev) =>
                       prev ? { ...prev, cidade: e.target.value } : null
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label>Vendedor Responsável</Label>
-                <Input
-                  value={editingCustomer.vendedorResponsavel}
-                  onChange={(e) =>
-                    setEditingCustomer((prev) =>
-                      prev
-                        ? { ...prev, vendedorResponsavel: e.target.value }
-                        : null
                     )
                   }
                 />
@@ -569,6 +430,7 @@ export const CustomersPage = () => {
         </Dialog>
       )}
 
+      {/* Inactive Customers Dialog */}
       <Dialog open={isInactiveModalOpen} onOpenChange={setIsInactiveModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -586,10 +448,10 @@ export const CustomersPage = () => {
                 >
                   <div>
                     <p className="font-medium text-muted-foreground">
-                      {customer.pessoa.nome}
+                      {customer.nome}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {customer.pessoa.email}
+                      {customer.email}
                     </p>
                   </div>
                   <Button onClick={() => handleReactivateCustomer(customer)}>
@@ -606,183 +468,6 @@ export const CustomersPage = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      {addingProductsToCustomer && (
-        <Dialog
-          open={!!addingProductsToCustomer}
-          onOpenChange={() => {
-            setAddingProductsToCustomer(null);
-            setNewlySelectedProducts([]);
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                Adicionar Produtos a {addingProductsToCustomer.pessoa.nome}
-              </DialogTitle>
-              <DialogDescription>
-                Selecione os produtos para adicionar a este cliente.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <Label>Produtos Disponíveis</Label>
-              <div className="space-y-2 max-h-60 overflow-y-auto border p-2 rounded-md">
-                {availableProducts
-                  .filter(
-                    (p) =>
-                      p.ativo &&
-                      !addingProductsToCustomer.produtos.some(
-                        (cp) => cp.id === p.id
-                      )
-                  )
-                  .map((product) => (
-                    <div
-                      key={product.id}
-                      className="flex items-center space-x-2"
-                    >
-                      <Checkbox
-                        id={`prod-${product.id}`}
-                        onCheckedChange={(checked) => {
-                          setNewlySelectedProducts((prev) =>
-                            checked
-                              ? [...prev, product.id]
-                              : prev.filter((id) => id !== product.id)
-                          );
-                        }}
-                      />
-                      <label
-                        htmlFor={`prod-${product.id}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {product.nome}
-                      </label>
-                    </div>
-                  ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setAddingProductsToCustomer(null);
-                  setNewlySelectedProducts([]);
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveNewProducts}>
-                Adicionar Selecionados
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {viewingCustomerProducts && (
-        <Dialog
-          open={!!viewingCustomerProducts}
-          onOpenChange={() => setViewingCustomerProducts(null)}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                Produtos de {viewingCustomerProducts.pessoa.nome}
-              </DialogTitle>
-              <DialogDescription>
-                Visualize, remova ou substitua os produtos deste cliente.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2 py-4 max-h-[60vh] overflow-y-auto">
-              {viewingCustomerProducts.produtos.length > 0 ? (
-                viewingCustomerProducts.produtos.map((product) => (
-                  <div
-                    key={product.id}
-                    className="p-3 border rounded-md flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="font-medium">{product.nome}</p>
-                      <p className="text-sm text-gray-500">
-                        {product.descricao}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        title="Substituir Produto"
-                        onClick={() =>
-                          setReplacingProduct({
-                            customer: viewingCustomerProducts,
-                            oldProductId: product.id,
-                          })
-                        }
-                      >
-                        <Replace className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        title="Remover Produto"
-                        onClick={() =>
-                          handleRemoveProduct(
-                            viewingCustomerProducts,
-                            product.id
-                          )
-                        }
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-gray-500">
-                  Este cliente ainda não possui produtos.
-                </p>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {replacingProduct && (
-        <Dialog
-          open={!!replacingProduct}
-          onOpenChange={() => setReplacingProduct(null)}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Substituir Produto</DialogTitle>
-              <DialogDescription>
-                Selecione o novo produto para substituir o antigo.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <Label>Selecione o novo produto</Label>
-              <Select onValueChange={handleReplaceProduct}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Escolha um novo produto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableProducts
-                    .filter(
-                      (p) =>
-                        p.ativo &&
-                        !replacingProduct.customer.produtos.some(
-                          (cp) => cp.id === p.id
-                        )
-                    )
-                    .map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.nome}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };

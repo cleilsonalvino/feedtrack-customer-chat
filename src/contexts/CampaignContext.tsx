@@ -3,8 +3,9 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import api from '../lib/api';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext"; // para pegar o usuário logado
 
-// Interface baseada na sua API de Campanhas
+// --- INTERFACES ---
 export interface Campanha {
   id: string;
   titulo: string;
@@ -17,6 +18,7 @@ export interface Campanha {
   templateMensagem: string;
   formularioId: string;
   ativo: boolean;
+  empresaId: string; // agora obrigatório
 }
 
 export type NewCampaignData = Omit<Campanha, 'id' | 'ativo'>;
@@ -30,17 +32,21 @@ interface CampaignContextType {
   fetchCampaigns: () => Promise<void>;
 }
 
+// --- CONTEXT ---
 const CampaignContext = createContext<CampaignContextType | undefined>(undefined);
 
+// --- PROVIDER ---
 export const CampaignProvider = ({ children }: { children: ReactNode }) => {
   const [campaigns, setCampaigns] = useState<Campanha[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth(); // usuário logado
 
   const fetchCampaigns = async () => {
+    if (!user?.empresaId) return;
     try {
       setLoading(true);
-      const response = await api.get('/campanhas');
+      const response = await api.get(`/campanhas?empresaId=${user.empresaId}`);
       setCampaigns(response.data);
     } catch (error) {
       console.error("Erro ao buscar campanhas:", error);
@@ -56,13 +62,15 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     fetchCampaigns();
-  }, []);
+  }, [user?.empresaId]);
 
   const addCampaign = async (campaignData: NewCampaignData) => {
+    if (!user?.empresaId) return;
     try {
-      const response = await api.post('/campanha', campaignData);
+      const payload = { ...campaignData, empresaId: user.empresaId };
+      const response = await api.post('/campanha', payload);
       const newCampaign = response.data;
-      await fetchCampaigns(); // Recarrega a lista para incluir a nova campanha
+      await fetchCampaigns();
       toast({ title: "Sucesso", description: "Campanha criada com sucesso!" });
       return newCampaign;
     } catch (error) {
@@ -72,36 +80,17 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateCampaign = async (campaignId: string, campaignData: Partial<NewCampaignData & { ativo: boolean }>) => {
-    // Encontra a campanha atual no estado para usar como base
+    if (!user?.empresaId) return;
     const campaignToUpdate = campaigns.find(c => c.id === campaignId);
     if (!campaignToUpdate) {
-        toast({ title: "Erro", description: "Campanha não encontrada para atualizar.", variant: "destructive" });
-        return;
+      toast({ title: "Erro", description: "Campanha não encontrada para atualizar.", variant: "destructive" });
+      return;
     }
-
-    // Combina os dados existentes com as novas alterações
-    const updatedLocalCampaign = { ...campaignToUpdate, ...campaignData };
+    const updatedLocalCampaign = { ...campaignToUpdate, ...campaignData, empresaId: user.empresaId };
 
     try {
-      // <<< CORRIGIDO: Cria um payload limpo com todos os campos editáveis,
-      // garantindo que a API receba o objeto completo que espera.
-      const payload = {
-        titulo: updatedLocalCampaign.titulo,
-        descricao: updatedLocalCampaign.descricao,
-        tipoCampanha: updatedLocalCampaign.tipoCampanha,
-        segmentoAlvo: updatedLocalCampaign.segmentoAlvo,
-        dataInicio: updatedLocalCampaign.dataInicio,
-        dataFim: updatedLocalCampaign.dataFim,
-        templateMensagem: updatedLocalCampaign.templateMensagem,
-        formularioId: updatedLocalCampaign.formularioId,
-        ativo: updatedLocalCampaign.ativo,
-      };
-
-      await api.put(`/atualizar-campanha/${campaignId}`, payload);
-      
-      // Atualiza o estado local para uma resposta visual imediata
+      await api.put(`/atualizar-campanha/${campaignId}`, updatedLocalCampaign);
       setCampaigns(current => current.map(c => c.id === campaignId ? updatedLocalCampaign : c));
-      
       toast({ title: "Sucesso", description: "Campanha atualizada." });
     } catch (error) {
       console.error("Erro ao atualizar campanha:", error);
@@ -111,9 +100,7 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteCampaign = async (campaignId: string) => {
     try {
-      // A rota DELETE é para exclusão lógica (desativar)
       await api.delete(`/deletar-campanha/${campaignId}`);
-      // Atualiza o estado local para refletir a mudança
       setCampaigns(current => current.map(c => c.id === campaignId ? { ...c, ativo: false } : c));
       toast({ title: "Sucesso", description: "Campanha desativada." });
     } catch (error) {
@@ -129,6 +116,7 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// --- HOOK ---
 export const useCampaign = (): CampaignContextType => {
   const context = useContext(CampaignContext);
   if (!context) throw new Error("useCampaign must be used within a CampaignProvider");

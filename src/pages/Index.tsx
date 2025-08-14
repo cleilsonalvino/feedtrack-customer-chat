@@ -21,18 +21,8 @@ const Index = () => {
 
   useEffect(()=>{
         const userData = localStorage.getItem("user");
-    const usuarioId = userData ? JSON.parse(userData).usuario.nomeEmpresa: null;
-
-    if (!usuarioId) {
-      toast({
-        title: "Erro de Autenticação",
-        description: "ID do usuário não encontrado. Faça login novamente.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setNomeEmpresa(usuarioId)
+    const nomeEmpresa = userData ? JSON.parse(userData).nomeEmpresa: null;
+    setNomeEmpresa(nomeEmpresa)
 
   }, [])
 

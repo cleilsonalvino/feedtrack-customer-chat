@@ -224,15 +224,60 @@ export const ProductsPage = () => {
               <DialogTitle>Editar Produto</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              {/* ... campos de edição ... */}
+              <div>
+                <Label htmlFor="edit-nome">Nome do Produto</Label>
+                <Input id="edit-nome" value={editingProduct.nome} onChange={(e) => setEditingProduct({ ...editingProduct, nome: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor="edit-descricao">Descrição</Label>
+                <Input id="edit-descricao" value={editingProduct.descricao} onChange={(e) => setEditingProduct({ ...editingProduct, descricao: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor="edit-valor">Valor (R$)</Label>
+                <Input id="edit-valor" type="number" step="0.01" value={editingProduct.valor === 0 ? '' : editingProduct.valor} onChange={(e) => setEditingProduct({ ...editingProduct, valor: Number(e.target.value) || 0 })} />
+              </div>
             </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingProduct(null)}>Cancelar</Button>
+              <Button onClick={handleSaveEdit}>Salvar Alterações</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
 
       {/* Modal de Produtos Inativos */}
       <Dialog open={isInactiveModalOpen} onOpenChange={setIsInactiveModalOpen}>
-        {/* ... conteúdo do modal de inativos ... */}
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Produtos Inativos</DialogTitle>
+            <DialogDescription>
+              Lista de produtos que foram desativados. Você pode reativá-los a qualquer momento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4 max-h-[400px] overflow-y-auto">
+            {inactiveProducts.length > 0 ? (
+              inactiveProducts.map((p) => (
+                <div key={p.id} className="p-3 border rounded-md flex justify-between items-center">
+                  <div>
+                    <p className="font-medium">{p.nome}</p>
+                    <p className="text-sm text-gray-500">
+                      Desativado em: {p.dataExclusao ? new Date(p.dataExclusao).toLocaleDateString('pt-BR') : 'N/A'}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => handleReactivateProduct(p)}>
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reativar
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-gray-500 pt-10">Nenhum produto inativo.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsInactiveModalOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
 
       {/* NOVO MODAL: Para Adicionar Produtos em Lote */}

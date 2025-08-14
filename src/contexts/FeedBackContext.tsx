@@ -1,24 +1,19 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import api from "../lib/api";  // ajuste o caminho conforme a estrutura do seu projeto
+import api from "../lib/api"; 
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
-
-// Tipos de API
+// --- TIPOS ---
 export type FeedbackApiResponse = {
   id: string;
   formularioId: string;
   envioId: string;
   respostas: { perguntaId: string; resposta: any }[];
+  empresaId: string;
   dataCriacao: string;
   dataExclusao?: string | null;
 };
 
-export type FeedbackApiRequest = {
-  formularioId: string;
-  envioId: string;
-  respostas: { perguntaId: string; resposta: any }[];
-};
-
-// NOVO: Tipo para o payload do formulário dinâmico
 export type DynamicFeedbackPayload = {
   clienteNome: string;
   produtoNome: string;
@@ -31,7 +26,7 @@ export type DynamicFeedbackPayload = {
   }[];
 };
 
-// Tipo para a estrutura de um formulário
+// --- FORMULÁRIOS ---
 export type IFormulario = {
   id: string;
   titulo: string;
@@ -49,55 +44,17 @@ export type IFormulario = {
   dataExclusao?: string | null;
 };
 
+// --- FUNCIONÁRIOS ---
 export type IFuncionario = {
   id: string;
   usuarioId: string;
   cargo: string;
   telefone?: string;
 };
+export type Usuario = { id: string; nomeUsuario: string; };
+export type FuncionarioComNome = IFuncionario & { nomeUsuario?: string; };
 
-export type Usuario = {
-  id: string;
-  nomeUsuario: string;
-  // outros campos que precisar
-};
-
-async function fetchUsuarioPorId(id: string): Promise<Usuario | null> {
-  try {
-    const { data } = await api.get<Usuario>(`/usuarios/${id}`);
-    
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-export type FuncionarioComNome = IFuncionario & { nomeUsuario?: string };
-
-async function fetchFuncionariosComNomeApi(): Promise<FuncionarioComNome[]> {
-  try {
-    const { data: funcionarios } = await api.get<IFuncionario[]>("/funcionarios");
-
-    
-
-    const funcionariosComNome = await Promise.all(
-      funcionarios.map(async (func) => {
-        const usuario = await fetchUsuarioPorId(func.usuarioId);
-        return {
-          ...func,
-          nomeUsuario: usuario?.nomeUsuario || "Nome não encontrado",
-        };
-      })
-    );
-
-    return funcionariosComNome;
-  } catch {
-    return [];
-  }
-}
-
-
-
+// --- CONTEXTO ---
 type FeedBackContextType = {
   feedbacks: FeedbackApiResponse[];
   fetchFeedbacks: () => Promise<void>;
@@ -105,10 +62,10 @@ type FeedBackContextType = {
   deleteFeedback: (id: string) => Promise<boolean>;
   formularios: IFormulario[];
   fetchFormularios: () => Promise<void>;
-fetchFuncionariosComNome: () => Promise<void>;
+  funcionarios: FuncionarioComNome[];
+  fetchFuncionariosComNome: () => Promise<void>;
   loading: boolean;
   error: string | null;
-    funcionarios: FuncionarioComNome[];
 };
 
 const FeedBackContext = createContext<FeedBackContextType | undefined>(undefined);
@@ -120,81 +77,97 @@ export const useFeedBack = () => {
 };
 
 export const FeedBackProvider = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth(); // pega empresaId do usuário logado
+  const { toast } = useToast();
+
   const [feedbacks, setFeedbacks] = useState<FeedbackApiResponse[]>([]);
   const [formularios, setFormularios] = useState<IFormulario[]>([]);
+  const [funcionarios, setFuncionarios] = useState<FuncionarioComNome[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [funcionarios, setFuncionarios] = useState<FuncionarioComNome[]>([]);
 
   const fetchFeedbacks = useCallback(async () => {
+    if (!user?.empresaId) return;
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get<FeedbackApiResponse[]>("/feedbacks");  // <- aqui usa api
+      const { data } = await api.get<FeedbackApiResponse[]>(`/feedbacks?empresaId=${user.empresaId}`);
       setFeedbacks(data);
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Erro desconhecido");
+      setError(err.response?.data?.message || err.message || "Erro ao buscar feedbacks");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.empresaId]);
 
   const fetchFormularios = useCallback(async () => {
+    if (!user?.empresaId) return;
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get<IFormulario[]>("/formularios");  // <- aqui usa api
+      const { data } = await api.get<IFormulario[]>(`/formularios?empresaId=${user.empresaId}`);
       setFormularios(data.filter(f => f.ativo));
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Erro desconhecido");
+      setError(err.response?.data?.message || err.message || "Erro ao buscar formulários");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.empresaId]);
 
   const submitDynamicFeedback = useCallback(async (data: DynamicFeedbackPayload) => {
+    if (!user?.empresaId) return null;
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post<FeedbackApiResponse>("/feedback/manual", data);  // <- aqui usa api
-      setFeedbacks((prev) => [response.data, ...prev]);
+      const payload = { ...data, empresaId: user.empresaId }; // adiciona empresaId
+      const response = await api.post<FeedbackApiResponse>("/feedback/manual", payload);
+      setFeedbacks(prev => [response.data, ...prev]);
+      toast({ title: "Sucesso", description: "Feedback enviado!" });
       return response.data;
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Erro desconhecido ao submeter feedback.");
+      setError(err.response?.data?.message || err.message || "Erro ao submeter feedback");
+      toast({ title: "Erro", description: "Não foi possível enviar o feedback.", variant: "destructive" });
       return null;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.empresaId, toast]);
 
   const deleteFeedback = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
     try {
-      await api.delete(`/feedback/${id}`);  // <- aqui usa api
-      setFeedbacks((prev) => prev.filter((f) => f.id !== id));
+      await api.delete(`/feedback/${id}?empresaId=${user?.empresaId}`);
+      setFeedbacks(prev => prev.filter(f => f.id !== id));
+      toast({ title: "Sucesso", description: "Feedback excluído!" });
       return true;
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Erro desconhecido");
+      setError(err.response?.data?.message || err.message || "Erro ao deletar feedback");
+      toast({ title: "Erro", description: "Não foi possível excluir.", variant: "destructive" });
       return false;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.empresaId, toast]);
 
-const fetchFuncionariosComNome = useCallback(async () => {
-  setLoading(true);
-  setError(null);
-  try {
-    const dados = await fetchFuncionariosComNomeApi();
-    setFuncionarios(dados);
-  } catch (err: any) {
-    setError(err.response?.data?.message || err.message || "Erro desconhecido");
-  } finally {
-    setLoading(false);
-  }
-}, []);
-
+  const fetchFuncionariosComNome = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: funcionariosRaw } = await api.get<IFuncionario[]>(`/funcionarios?empresaId=${user?.empresaId}`);
+      const funcionariosComNome = await Promise.all(
+        funcionariosRaw.map(async func => {
+          const { data: usuario } = await api.get<Usuario>(`/usuarios/${func.usuarioId}`);
+          return { ...func, nomeUsuario: usuario?.nomeUsuario || "Nome não encontrado" };
+        })
+      );
+      setFuncionarios(funcionariosComNome);
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || "Erro ao buscar funcionários");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.empresaId]);
 
   return (
     <FeedBackContext.Provider
@@ -205,10 +178,10 @@ const fetchFuncionariosComNome = useCallback(async () => {
         deleteFeedback,
         formularios,
         fetchFormularios,
-        loading,
-        error,
         funcionarios,
-        fetchFuncionariosComNome
+        fetchFuncionariosComNome,
+        loading,
+        error
       }}
     >
       {children}

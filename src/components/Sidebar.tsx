@@ -1,25 +1,30 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, Users, MessageSquare, Settings, FileBarChart, LogOut, Star, FolderKanban } from "lucide-react";
+import {
+  BarChart3,
+  Users,
+  MessageSquare,
+  Settings,
+  FileBarChart,
+  LogOut,
+  Star,
+  FolderKanban,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
-
-
-
 
 const getNavigation = (isAdmin: boolean) => {
   const baseNavigation = [
     { name: "Clientes", href: "/customers", icon: Users },
     { name: "Campanhas", href: "/campaigns", icon: MessageSquare },
     { name: "Feedbacks", href: "/feedbacks", icon: Star },
-    {name: "Produtos", href: "/products", icon: Star }, // 👈 1. Adiciona a rota de produtos
-
+    { name: "Produtos", href: "/products", icon: Star },
   ];
 
   const adminNavigation = [
     { name: "Dashboard", href: "/home", icon: BarChart3 },
     ...baseNavigation,
-     { name: "Editor de Formulário", href: "/form-builder", icon: FolderKanban },
+    { name: "Editor de Formulário", href: "/form-builder", icon: FolderKanban },
     { name: "Relatórios", href: "/reports", icon: FileBarChart },
     { name: "Configurações", href: "/settings", icon: Settings },
   ];
@@ -27,36 +32,32 @@ const getNavigation = (isAdmin: boolean) => {
   return isAdmin ? adminNavigation : baseNavigation;
 };
 
-
-
-export const Sidebar = ({onClose}) => {
+export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   const location = useLocation();
-  const { user, logout } = useAuth();
-   const navigate = useNavigate(); // 👈 necessário para redirecionar
+  const navigate = useNavigate();
+  const { user, userEmpresa, logout } = useAuth();
 
-  const [nomeEmpresa, setNomeEmpresa] = useState<string>();
-  const [tipoUsuario, setTipoUsuario] =  useState<string>();
-  const navigation = getNavigation(tipoUsuario === "EMPRESA" || user?.tipo === "usuario");
+  const [nomeEmpresa, setNomeEmpresa] = useState<string>("");
+  const [tipoUsuario, setTipoUsuario] = useState<string>("");
 
-    const handleLogout = () => {
-    logout();        // limpa o estado do usuário
-    onClose?.();     // fecha o menu lateral (caso esteja aberto)
-    navigate("/login"); // 👈 redireciona corretamente para tela de login
+  const isAdmin = user?.tipo === "ADMIN" || user?.tipo === "SUPER_ADMIN";
+  const navigation = getNavigation(isAdmin);
+
+  const handleLogout = () => {
+    logout();
+    onClose?.();
+    navigate("/login");
   };
 
   useEffect(() => {
-const userString = localStorage.getItem("user");
-if (userString) {
-  const user = JSON.parse(userString);
-  setTipoUsuario(user.usuario.tipo)
-  setNomeEmpresa(user.usuario.nomeEmpresa);
-}
-
-  }, []);
+    setNomeEmpresa(userEmpresa?.props.nome || user?.nomeUsuario || "");
+    setTipoUsuario(user?.tipo || "");
+  }, [user, userEmpresa]);
 
   return (
     <div className="w-64 bg-card border-r h-screen sticky top-0 flex flex-col">
-      <div className="p-6 border-b ">
+      {/* Header */}
+      <div className="p-6 border-b">
         <div className="flex justify-start gap-2">
           <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
             <BarChart3 className="w-5 h-5 text-primary-foreground" />
@@ -67,11 +68,14 @@ if (userString) {
         </div>
       </div>
 
+      {/* Navigation */}
       <nav className="flex-1 p-4">
         <div className="mb-4 px-3 py-2 bg-muted/50 rounded-lg">
-          <p className="text-xs text-muted-foreground">Logado como: {tipoUsuario}</p>
+          <p className="text-xs text-muted-foreground">
+            Logado como: {tipoUsuario}
+          </p>
         </div>
-        
+
         <ul className="space-y-2">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
@@ -93,13 +97,10 @@ if (userString) {
               </li>
             );
           })}
-          
+
           <li>
             <button
-              onClick={() => {
-                logout();
-                onClose?.();
-              }}
+              onClick={handleLogout}
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground w-full text-left"
             >
               <LogOut className="w-4 h-4" />
@@ -108,6 +109,8 @@ if (userString) {
           </li>
         </ul>
       </nav>
+
+      {/* Footer */}
       <div className="p-4 border-t">
         <div className="text-xs text-muted-foreground">
           <p>FeedTrack v1.0</p>

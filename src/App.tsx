@@ -10,7 +10,7 @@ import Index from "./pages/Index";
 import { CustomersPage } from "./pages/CustomersPage";
 import { CampaignsPage } from "./pages/CampaignsPage";
 import { ReportsPage } from "./pages/ReportsPage";
-// import { SettingsPage } from "./pages/SettingsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { FeedbacksPage } from "./pages/FeedbacksPage"; // 👈 1. IMPORTA A NOVA PÁGINA
 import NotFound from "./pages/NotFound";
 import { Login } from "./pages/Login";
@@ -80,7 +80,7 @@ const App = () => (
                           <Route path="/form-builder" element={<FormsPage />} />
                           <Route path="/products" element={<ProductsPage />} />
                           <Route path="/reports" element={<ReportsPage />} />
-                          {/* <Route path="/settings" element={<SettingsPage />} /> */}
+                          <Route path="/settings" element={<SettingsPage />} />
                           <Route path="*" element={<NotFound />} />
                         </Route>
                       </Routes>

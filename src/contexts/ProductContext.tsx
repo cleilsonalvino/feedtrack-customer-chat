@@ -119,7 +119,11 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
         dataExclusao: productToUpdate.dataExclusao,
       };
       
-      await api.put(`/atualizar-produto/${productToUpdate.id}`, payload);
+      if (productToUpdate.ativo && productToUpdate.dataExclusao === null) {
+        await api.patch(`/reativar-produto/${productToUpdate.id}`, payload);
+      } else {
+        await api.put(`/atualizar-produto/${productToUpdate.id}`, payload);
+      }
       
       setProducts(current => 
         current.map(p => (p.id === productToUpdate.id ? productToUpdate : p))

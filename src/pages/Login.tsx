@@ -117,10 +117,6 @@ export const Login = () => {
           </button>
           <p>Não tem uma conta? <Link to="/register" className="underline text-blue-500">Cadastre-se</Link></p>
 
-          <p className="text-center text-sm text-gray-500 mt-3">
-            Teste com: <span className="font-mono">admin/admin123</span> ou{" "}
-            <span className="font-mono">funcionario/func123</span>
-          </p>
         </form>
       </div>
     </div>

@@ -53,6 +53,8 @@ const OnboardingPage = () => {
           description: "Produto cadastrado com sucesso!",
         });
         setStep(step + 1);
+
+            navigate("/home"); // Redireciona para a página inicial após o onboarding
       } catch (error) {
         toast({
           title: "Erro",
@@ -62,7 +64,7 @@ const OnboardingPage = () => {
       }
     }
 
-    navigate("/home"); // Redireciona para a página inicial após o onboarding
+
 
   };
 

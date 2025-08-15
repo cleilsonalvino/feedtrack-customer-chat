@@ -5,18 +5,31 @@ import { useAuth } from "../contexts/AuthContext";
 export const Login = () => {
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
+  const [empresaId, setEmpresaId] = useState("");
   const [alerta, setAlerta] = useState<{ tipo: "success" | "danger"; mensagem: string } | null>(null);
   const [loginSucesso, setLoginSucesso] = useState(false);
-
+  const [verSenha, setVerSenha] = useState(false); // 👁️
+  
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // === Carrega dados salvos no localStorage ===
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const parsedUser = JSON.parse(storedUser);
+      setUsuario(parsedUser.nomeUsuario || "");
+      setSenha(parsedUser.senha || "admin123");
+      setEmpresaId(parsedUser.empresaId || "");
+
+    }
+  }, []);
 
   useEffect(() => {
     if (loginSucesso) {
       const timer = setTimeout(() => {
-        navigate("/home"); // Ajuste para sua rota principal
+        navigate("/home");
       }, 1500);
-
       return () => clearTimeout(timer);
     }
   }, [loginSucesso, navigate]);
@@ -38,7 +51,9 @@ export const Login = () => {
       await login(usuario, senha);
       setAlerta({ tipo: "success", mensagem: "Login realizado com sucesso! Redirecionando..." });
       setLoginSucesso(true);
-      
+
+      // salva para próximos logins
+      localStorage.setItem("user", JSON.stringify({ nomeUsuario: usuario, senha, empresaId }));
     } catch (error) {
       setAlerta({ tipo: "danger", mensagem: "Credenciais inválidas. Verifique seu usuário e senha." });
     }
@@ -47,31 +62,21 @@ export const Login = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
       <div className="w-full max-w-4xl bg-white shadow-xl rounded-xl p-6 md:flex md:gap-8">
-        {/* Imagem */}
+
         <div className="hidden md:flex items-center justify-center">
           <img src="./login.jpg" alt="Login" className="w-[300px] h-[300px] object-cover rounded-md" />
         </div>
 
-        {/* Formulário */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 justify-center gap-4">
           <h1 className="text-2xl font-bold text-center text-blue-800">FeedTrack - Software</h1>
 
           {alerta && (
-            <div
-              className={`rounded-md px-4 py-3 text-sm font-medium flex justify-between items-center ${
-                alerta.tipo === "success"
-                  ? "bg-green-100 text-green-800"
-                  : "bg-red-100 text-red-800"
-              }`}
+            <div className={`rounded-md px-4 py-3 text-sm font-medium flex justify-between items-center ${
+                  alerta.tipo === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                }`}
             >
               <span>{alerta.mensagem}</span>
-              <button
-                type="button"
-                onClick={() => setAlerta(null)}
-                className="text-xl leading-none font-bold ml-2"
-              >
-                ×
-              </button>
+              <button type="button" onClick={() => setAlerta(null)} className="text-xl leading-none font-bold ml-2">×</button>
             </div>
           )}
 
@@ -93,14 +98,24 @@ export const Login = () => {
             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
               Senha
             </label>
-            <input
-              id="password"
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={verSenha ? "text" : "password"}
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                required
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
+              />
+              {/* botão mostrar/ocultar */}
+              <button
+                type="button"
+                onClick={() => setVerSenha(!verSenha)}
+                className="absolute inset-y-0 right-3 top-1/2 transform -translate-y-1/2 text-sm text-blue-600"
+              >
+                {verSenha ? "Ocultar" : "Mostrar"}
+              </button>
+            </div>
           </div>
 
           <div className="text-right">
@@ -115,8 +130,13 @@ export const Login = () => {
           >
             Login
           </button>
-          <p>Não tem uma conta? <Link to="/register" className="underline text-blue-500">Cadastre-se</Link></p>
 
+          <p>
+            Não tem uma conta?{" "}
+            <Link to="/register" className="underline text-blue-500">
+              Cadastre-se
+            </Link>
+          </p>
         </form>
       </div>
     </div>

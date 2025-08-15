@@ -32,7 +32,7 @@ export const ProductsPage = () => {
 
   // Estados para o formulário de adição em lote
   const [batchProducts, setBatchProducts] = useState<NewProductData[]>([]);
-  const [batchFormState, setBatchFormState] = useState<NewProductData>({ nome: "", descricao: "", valor: 0 });
+  const [batchFormState, setBatchFormState] = useState<NewProductData>({ nome: "", descricao: "", valor: 0, empresaId: "" });
 
   const { activeProducts, inactiveProducts } = useMemo(() => {
     const active: Product[] = [];
@@ -62,14 +62,14 @@ export const ProductsPage = () => {
     setSearchTerm(e.target.value);
   };
 
-  const [newData, setNewData] = useState({ nome: "", descricao: "", valor: 0 });
+  const [newData, setNewData] = useState({ nome: "", descricao: "", valor: 0, empresaId: "" });
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newData.nome.trim() && newData.descricao.trim() && newData.valor > 0) {
       const newProduct = await addProduct(newData); 
       if (newProduct) {
-        setNewData({ nome: "", descricao: "", valor: 0 });
+        setNewData({ nome: "", descricao: "", valor: 0, empresaId: "" });
         setIsAddDialogOpen(false);
         if (location.state?.from === "/feedbacks") {
           navigate("/feedbacks", { state: { newProductId: newProduct.id } });
@@ -88,7 +88,7 @@ export const ProductsPage = () => {
   const handleAddProductToBatch = () => {
     if (batchFormState.nome.trim() && batchFormState.descricao.trim() && batchFormState.valor > 0) {
         setBatchProducts([...batchProducts, batchFormState]);
-        setBatchFormState({ nome: "", descricao: "", valor: 0 }); // Reseta o formulário
+        setBatchFormState({ nome: "", descricao: "", valor: 0, empresaId: "" }); // Reseta o formulário
     } else {
         toast({
             title: "Campos Inválidos",

@@ -3,10 +3,8 @@ import api from "@/lib/api";
 
 type UserEmpresa = {
   id: string;
-  props:{
-    nome: string;
+  nome: string;
   cnpj?: string;
-  }
 };
 
 type User = {
@@ -28,7 +26,7 @@ type AuthContextType = {
   isAuthenticated: boolean;
   loading: boolean;
   login: (nomeUsuario: string, senha: string) => Promise<void>;
-  register: (data: { nome: string; cnpj?: string }) => Promise<void>;
+  register: (data: { nome: string; cnpj?: string; email: string; plano: string }) => Promise<void>;
   logout: () => void;
 };
 
@@ -55,52 +53,44 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setLoading(false);
   }, []);
 
-const login = async (nomeUsuario: string, senha: string) => {
-  try {
-    const response = await api.post("/login", { nomeUsuario, senha });
-    const usuario: User = response.data;
+  const login = async (nomeUsuario: string, senha: string) => {
+    try {
+      const response = await api.post("/login", { nomeUsuario, senha });
+      const usuario: User = response.data;
 
-    // Salva usuário
-    localStorage.setItem("user", JSON.stringify(usuario));
-    setUser(usuario);
-
-    // Busca empresa se o usuário tiver empresaId
-    if (usuario.empresaId) {
-      const empresaRes = await api.get(`/empresa/${usuario.empresaId}`);
-      const empresa: UserEmpresa = empresaRes.data;
-      setUserEmpresa(empresa);
-      localStorage.setItem("userEmpresa", JSON.stringify(empresa));
-    } else {
-      setUserEmpresa(null);
-      localStorage.removeItem("userEmpresa");
+      if (usuario.empresaId) {
+        const empresaRes = await api.get(`/empresa/${usuario.empresaId}`);
+        const empresa: UserEmpresa = empresaRes.data;
+        setUserEmpresa(empresa);
+        localStorage.setItem("userEmpresa", JSON.stringify(empresa));
+      } else {
+        setUserEmpresa(null);
+        localStorage.removeItem("userEmpresa");
+      }
+    } catch (error: any) {
+      throw new Error("Falha no login: " + (error.response?.data?.message || error.message));
     }
-  } catch (error: any) {
-    throw new Error(
-      "Falha no login: " +
-        (error.response?.data?.message || error.message)
-    );
-  }
-};
+  };
 
-
-  const register = async (data: { nome: string; cnpj?: string }) => {
+  const register = async (data: { nome: string; cnpj?: string; email: string; plano: string }) => {
     try {
       const payload = {
         nome: data.nome,
         cnpj: data.cnpj?.trim() ? data.cnpj : undefined,
+        email: data.email,
+        plano: data.plano,
       };
 
       /**
-       * O backend retorna algo assim:
+       * Esperando:
        * {
-       *   empresa: { id, nome, cnpj },
-       *   usuario: { id, nomeUsuario, tipo, ... }
+       *  empresa: {...},
+       *  usuario: {...}
        * }
        */
       const response = await api.post("/empresa", payload);
       const { empresa, usuario } = response.data;
 
-      // Salva os dois
       localStorage.setItem("userEmpresa", JSON.stringify(empresa));
       setUserEmpresa(empresa);
 

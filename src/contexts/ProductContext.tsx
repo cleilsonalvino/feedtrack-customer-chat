@@ -17,6 +17,7 @@ export type NewProductData = {
   nome: string;
   descricao: string;
   valor: number;
+  empresaId: string;
 };
 
 interface ProductContextType {
@@ -34,44 +35,57 @@ export const ProductProvider = ({ children }: { children: ReactNode }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const storedUser = localStorage.getItem("user");
+const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+const empresaId = parsedUser?.empresaId;
+  
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get('/produtos');
-        setProducts(response.data);
-      } catch (error) {
-        console.error("Erro ao buscar produtos:", error);
-        toast({
-          title: "Erro de Rede",
-          description: "Não foi possível carregar os produtos.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, [toast]);
+useEffect(() => {
+  const fetchProducts = async () => {
+    if (!empresaId) return;
 
-  const addProduct = async (productData: NewProductData, showToast = true) => {
     try {
-      const response = await api.post('/produto', productData);
-      const newProduct = response.data;
-      setProducts(current => [...current, newProduct]);
-      if (showToast) {
-        toast({ title: "Sucesso", description: `Produto "${newProduct.nome}" adicionado!` });
-      }
-      return newProduct;
+      setLoading(true);
+      const response = await api.get(`/produtos?empresaId=${empresaId}`);
+      setProducts(response.data);
     } catch (error) {
-      console.error("Erro ao adicionar produto:", error);
-      if (showToast) {
-        toast({ title: "Erro", description: `Não foi possível adicionar o produto "${productData.nome}".`, variant: "destructive" });
-      }
-      throw error; // Lança o erro para que o chamador saiba que falhou
+      console.error("Erro ao buscar produtos:", error);
+      toast({
+        title: "Erro de Rede",
+        description: "Não foi possível carregar os produtos.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
+
+  fetchProducts();
+}, [empresaId, toast]);
+
+
+const addProduct = async (productData: NewProductData, showToast = true) => {
+  if (!empresaId) return; // evita erro se empresaId não existir
+
+  try {
+    const payload = { ...productData, empresaId }; // força incluir empresaId
+    const response = await api.post(`/produto`, payload);
+    const newProduct = response.data;
+    setProducts(current => [...current, newProduct]);
+    if (showToast) {
+      toast({ title: "Sucesso", description: `Produto "${newProduct.nome}" adicionado!` });
+    }
+    return newProduct;
+  } catch (error) {
+    console.error("Erro ao adicionar produto:", error);
+    if (showToast) {
+      toast({ title: "Erro", description: `Não foi possível adicionar o produto "${productData.nome}".`, variant: "destructive" });
+    }
+    throw error;
+  }
+};
+
+
 
   // Função para adicionar múltiplos produtos a partir de um array
   const addMultipleProducts = async (productsData: NewProductData[]) => {

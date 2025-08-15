@@ -5,6 +5,8 @@ import { useAuth } from "../contexts/AuthContext";
 export const Register = () => {
   const [nome, setNomeEmpresa] = useState("");
   const [cnpj, setCnpj] = useState("");
+  const [email, setEmail] = useState("");
+  const [plano, setPlano] = useState("FREE"); // exemplo de valor default
   const [alerta, setAlerta] = useState<{
     tipo: "success" | "danger";
     mensagem: string;
@@ -18,7 +20,10 @@ export const Register = () => {
     setAlerta(null);
 
     if (!nome.trim()) {
-      setAlerta({ tipo: "danger", mensagem: "O campo Nome da Empresa é obrigatório." });
+      setAlerta({
+        tipo: "danger",
+        mensagem: "O campo Nome da Empresa é obrigatório.",
+      });
       return;
     }
 
@@ -26,15 +31,23 @@ export const Register = () => {
       await register({
         nome,
         cnpj: cnpj.trim() ? cnpj : undefined,
+        email,
+        plano,
       });
 
-      setAlerta({ tipo: "success", mensagem: "Empresa cadastrada com sucesso! Redirecionando..." });
+      setAlerta({
+        tipo: "success",
+        mensagem: "Empresa cadastrada com sucesso! Redirecionando...",
+      });
 
       setTimeout(() => {
-        navigate("/onboarding", { replace: true });
+        navigate("/login", { replace: true });
       }, 2000);
     } catch (error: any) {
-      setAlerta({ tipo: "danger", mensagem: error.message || "Erro ao cadastrar. Tente novamente." });
+      setAlerta({
+        tipo: "danger",
+        mensagem: error.message || "Erro ao cadastrar. Tente novamente.",
+      });
     }
   };
 
@@ -49,7 +62,10 @@ export const Register = () => {
           />
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 justify-center gap-4">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col flex-1 justify-center gap-4"
+        >
           <h1 className="text-2xl font-bold text-center text-blue-800">
             Cadastre sua empresa no FeedTrack
           </h1>
@@ -57,18 +73,27 @@ export const Register = () => {
           {alerta && (
             <div
               className={`rounded-md px-4 py-3 text-sm font-medium flex justify-between items-center ${
-                alerta.tipo === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                alerta.tipo === "success"
+                  ? "bg-green-100 text-green-800"
+                  : "bg-red-100 text-red-800"
               }`}
             >
               <span>{alerta.mensagem}</span>
-              <button type="button" onClick={() => setAlerta(null)} className="text-xl font-bold ml-2">
+              <button
+                type="button"
+                onClick={() => setAlerta(null)}
+                className="text-xl font-bold ml-2"
+              >
                 ×
               </button>
             </div>
           )}
 
           <div>
-            <label htmlFor="nomeEmpresa" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="nomeEmpresa"
+              className="block text-sm font-medium text-gray-700"
+            >
               Nome da Empresa
             </label>
             <input
@@ -82,7 +107,10 @@ export const Register = () => {
           </div>
 
           <div>
-            <label htmlFor="cnpj" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="cnpj"
+              className="block text-sm font-medium text-gray-700"
+            >
               CNPJ (opcional)
             </label>
             <input
@@ -94,21 +122,58 @@ export const Register = () => {
             />
           </div>
 
+          {/* NOVO CAMPO EMAIL */}
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700"
+            >
+              E-mail
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
+            />
+          </div>
+
+          {/* NOVO CAMPO PLANO */}
+          <div>
+            <label
+              htmlFor="plano"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Plano
+            </label>
+            <select
+              id="plano"
+              value={plano}
+              onChange={(e) => setPlano(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
+            >
+              <option value="FREE">Free</option>
+              <option value="BASIC">Basic</option>
+              <option value="PRO">Pro</option>
+            </select>
+          </div>
+
           <button
             type="submit"
             className="w-full bg-blue-600 text-white font-medium py-2 rounded-md hover:bg-blue-700 transition"
           >
             Cadastrar Empresa
           </button>
+
           <div className="flex">
             <p>voltar para</p>
-                     <Link to="/login" className="underline text-blue-500 ml-1">
+            <Link to="/login" className="underline text-blue-500 ml-1">
               Login
             </Link>
           </div>
-          
         </form>
-        
       </div>
     </div>
   );

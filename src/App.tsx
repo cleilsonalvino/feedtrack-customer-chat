@@ -25,7 +25,7 @@ import { FormsPage } from "./pages/FormsPage";
 import { CampaignProvider } from "./contexts/CampaignContext";
 import { FeedBackProvider } from "./contexts/FeedBackContext";
 import { ReportsProvider } from "./contexts/RepostsContext"; // 👈 3. IMPORTA O PROVIDER
-import OnboardingPage from "./pages/OnboardingPage";
+
 
 const allFeedbacks = [];
 
@@ -54,10 +54,6 @@ const App = () => (
                         <Route
                           path="/recuperar-senha"
                           element={<RecuperarSenha />}
-                        />
-                        <Route
-                          path="/onboarding"
-                          element={<OnboardingPage />}
                         />
 
                         {/* 🔐 Rota de avaliação com query params */}

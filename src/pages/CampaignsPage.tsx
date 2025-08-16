@@ -59,13 +59,15 @@ import { ptBR } from "date-fns/locale";
 interface Venda {
   id: string;
   dataVenda: string;
+  clienteId: string; // Keep original IDs for mapping
+  produtoId: string; // Keep original IDs for mapping
   cliente: {
     id: string;
     pessoa?: {
       nome: string;
     };
   };
-  produto: {
+  produto?: {
     id: string;
     nome: string;
   };
@@ -89,59 +91,57 @@ const ManualSendModal = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
-  const userString = localStorage.getItem("user");
-let empresaId: string | null = null;
-
-if (userString) {
-  const user = JSON.parse(userString);
-  empresaId = user.empresaId; // só pega o ID da empresa
-}
-
+  const { user } = useAuth(); // Use the user from AuthContext for consistency
 
   // Fetches sales from the API when the modal is opened.
-useEffect(() => {
-  if (isOpen && empresaId) {
-    const fetchVendas = async () => {
-      setLoadingVendas(true);
-      try {
-        // Busca vendas
-        const vendasResponse = await api.get(`/vendas?empresaId=${empresaId}`);
-        const vendasData: Venda[] = vendasResponse.data;
+  useEffect(() => {
+    if (isOpen && user?.empresaId) {
+      const fetchVendas = async () => {
+        setLoadingVendas(true);
+        try {
+          // Fetch all data in parallel
+          const [vendasResponse, clientesResponse, produtosResponse] = await Promise.all([
+            api.get(`/vendas?empresaId=${user.empresaId}`),
+            api.get(`/clientes?empresaId=${user.empresaId}`),
+            api.get(`/produtos?empresaId=${user.empresaId}`)
+          ]);
 
-        // Busca clientes e produtos
-        const clientesResponse = await api.get(`/clientes?empresaId=${empresaId}`);
-        const produtosResponse = await api.get(`/produtos?empresaId=${empresaId}`);
+          const vendasData: Venda[] = vendasResponse.data;
+          const clientes = clientesResponse.data;
+          const produtos = produtosResponse.data;
 
-        const clientes = clientesResponse.data;
-        const produtos = produtosResponse.data;
+          // Create maps for quick lookups
+          const clienteMap = new Map(clientes.map(c => [c.id, c]));
+          const produtoMap = new Map(produtos.map(p => [p.id, p]));
 
-        // Mapeia vendas com dados completos
-        const vendasCompletas = vendasData.map((venda) => ({
-          ...venda,
-          cliente: clientes.find((c) => c.id === venda.clienteId),
-          produto: produtos.find((p) => p.id === venda.produtoId),
-        }));
+          // Map sales with complete data
+const vendasCompletas: Venda[] = vendasData.map((venda) => ({
+  ...venda,
+  cliente: clienteMap.get(venda.clienteId) as Venda["cliente"], // << Type assertion
+  produto: produtoMap.get(venda.produtoId) as Venda["produto"] | undefined,
+}));
 
-        setVendas(vendasCompletas);
-      } catch (error) {
-        console.error("Erro ao buscar vendas:", error);
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar a lista de vendas.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoadingVendas(false);
-      }
-    };
 
-    fetchVendas();
-  } else {
-    // limpa estado quando fecha
-    setSelectedVendaIds([]);
-    setSearchTerm("");
-  }
-}, [isOpen, empresaId, toast]);
+          setVendas(vendasCompletas);
+        } catch (error) {
+          console.error("Erro ao buscar dados:", error);
+          toast({
+            title: "Erro",
+            description: "Não foi possível carregar a lista de vendas.",
+            variant: "destructive",
+          });
+        } finally {
+          setLoadingVendas(false);
+        }
+      };
+
+      fetchVendas();
+    } else {
+      // Clears state when the modal is closed.
+      setSelectedVendaIds([]);
+      setSearchTerm("");
+    }
+  }, [isOpen, user?.empresaId, toast]);
 
 
   // Filters sales based on the search term (client name).
@@ -163,57 +163,59 @@ useEffect(() => {
   };
 
   // Handles the manual campaign sending process.
-  const handleManualSend = async () => {
-    if (selectedVendaIds.length === 0) {
-      toast({
-        title: "Nenhuma venda selecionada",
-        description: "Por favor, selecione ao menos uma venda para o envio.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!campaign || !empresaId) {
-        toast({
-            title: "Erro de Autenticação",
-            description: "Dados da campanha ou do usuário não encontrados. Faça login novamente.",
-            variant: "destructive",
-        });
-        return;
-    }
-
-    setIsSending(true);
-    const sendPromises = selectedVendaIds.map((vendaId) => {
-        const venda = vendas.find(v => v.id === vendaId);
-        if (!venda) return Promise.resolve(); // Skip if sale not found
-
-        const payload = {
-            clienteId: venda.cliente.id,
-            campanhaId: campaign.id,
-            empresaId: empresaId,
-            produtoId: venda.produto.id,
-        };
-        // The sale ID is now passed in the URL
-        return api.post(`/envio/individual/${venda.id}`, payload);
+const handleManualSend = async () => {
+  if (selectedVendaIds.length === 0) {
+    toast({
+      title: "Nenhuma venda selecionada",
+      description: "Por favor, selecione ao menos uma venda para o envio.",
+      variant: "destructive",
     });
+    return;
+  }
 
-    try {
-      await Promise.all(sendPromises);
-      toast({
-        title: "Envio Concluído!",
-        description: `Campanha "${campaign.titulo}" enviada para ${selectedVendaIds.length} venda(s).`,
-      });
-      onOpenChange(false);
-    } catch (error) {
-      console.error("Erro no envio em massa:", error);
-      toast({
-        title: "Erro no Envio",
-        description: "Ocorreu um erro ao enviar a campanha para uma ou mais vendas.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSending(false);
-    }
-  };
+  if (!campaign || !user?.id || !user.empresaId) {
+    toast({
+      title: "Erro de Autenticação",
+      description: "Dados da campanha ou do usuário não encontrados. Faça login novamente.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setIsSending(true);
+
+  const sendPromises = selectedVendaIds.map((vendaId) => {
+    const venda = vendas.find(v => v.id === vendaId);
+    if (!venda) return Promise.resolve();
+
+    const payload = {
+      vendaId: venda.id,          // ID da venda enviado no JSON
+      empresaId: user.empresaId,
+      campanhaId: campaign.id
+    };
+
+    return api.post("/envio/individual", payload); // API espera o JSON, não URL
+  });
+
+  try {
+    await Promise.all(sendPromises);
+    toast({
+      title: "Envio Concluído!",
+      description: `Campanha "${campaign.titulo}" enviada para ${selectedVendaIds.length} venda(s).`,
+    });
+    onOpenChange(false);
+  } catch (error) {
+    console.error("Erro no envio em massa:", error);
+    toast({
+      title: "Erro no Envio",
+      description: "Ocorreu um erro ao enviar a campanha para uma ou mais vendas.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsSending(false);
+  }
+};
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -270,10 +272,13 @@ useEffect(() => {
                         );
                       }}
                     />
-<Label htmlFor={venda.id} className="w-full cursor-pointer">
-  {venda.cliente?.pessoa?.nome || "Cliente desconhecido"} - {venda.produto?.nome || "Produto desconhecido"}
-</Label>
-
+                    <Label
+                      htmlFor={venda.id}
+                      className="w-full cursor-pointer"
+                    >
+                      {/* --- FIX: Use optional chaining for produto.nome --- */}
+                      {venda.cliente?.pessoa?.nome || "Cliente desconhecido"} - {venda.produto?.nome || "Produto desconhecido"}
+                    </Label>
                   </div>
                 ))}
               </>

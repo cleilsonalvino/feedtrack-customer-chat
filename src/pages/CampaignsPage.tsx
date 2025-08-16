@@ -10,7 +10,12 @@ import {
 } from "../contexts/CampaignContext";
 import { useAuth } from "../contexts/AuthContext"; // Import useAuth for consistency
 import { useForm } from "../contexts/FormContext";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
@@ -63,9 +68,7 @@ interface Venda {
   produtoId: string; // Keep original IDs for mapping
   cliente: {
     id: string;
-    pessoa?: {
-      nome: string;
-    };
+    nome: string;
   };
   produto?: {
     id: string;
@@ -100,27 +103,31 @@ const ManualSendModal = ({
         setLoadingVendas(true);
         try {
           // Fetch all data in parallel
-          const [vendasResponse, clientesResponse, produtosResponse] = await Promise.all([
-            api.get(`/vendas?empresaId=${user.empresaId}`),
-            api.get(`/clientes?empresaId=${user.empresaId}`),
-            api.get(`/produtos?empresaId=${user.empresaId}`)
-          ]);
+          const [vendasResponse, clientesResponse, produtosResponse] =
+            await Promise.all([
+              api.get(`/vendas?empresaId=${user.empresaId}`),
+              api.get(`/clientes?empresaId=${user.empresaId}`),
+              api.get(`/produtos?empresaId=${user.empresaId}`),
+            ]);
 
           const vendasData: Venda[] = vendasResponse.data;
+          console.log("[VENDAS CAMPANHA]", vendasData);
           const clientes = clientesResponse.data;
+          console.log("[CLIENTES CAMPANHA]", clientes);
           const produtos = produtosResponse.data;
 
           // Create maps for quick lookups
-          const clienteMap = new Map(clientes.map(c => [c.id, c]));
-          const produtoMap = new Map(produtos.map(p => [p.id, p]));
+          const clienteMap = new Map(clientes.map((c) => [c.id, c]));
+          const produtoMap = new Map(produtos.map((p) => [p.id, p]));
 
           // Map sales with complete data
-const vendasCompletas: Venda[] = vendasData.map((venda) => ({
-  ...venda,
-  cliente: clienteMap.get(venda.clienteId) as Venda["cliente"], // << Type assertion
-  produto: produtoMap.get(venda.produtoId) as Venda["produto"] | undefined,
-}));
-
+          const vendasCompletas: Venda[] = vendasData.map((venda) => ({
+            ...venda,
+            cliente: clienteMap.get(venda.clienteId) as Venda["cliente"], // << Type assertion
+            produto: produtoMap.get(venda.produtoId) as
+              | Venda["produto"]
+              | undefined,
+          }));
 
           setVendas(vendasCompletas);
         } catch (error) {
@@ -143,11 +150,10 @@ const vendasCompletas: Venda[] = vendasData.map((venda) => ({
     }
   }, [isOpen, user?.empresaId, toast]);
 
-
   // Filters sales based on the search term (client name).
   const filteredVendas = useMemo(() => {
     return vendas.filter((venda) =>
-      (venda.cliente?.pessoa?.nome || "")
+      (venda.cliente?.nome || "")
         .toLowerCase()
         .includes(searchTerm.toLowerCase())
     );
@@ -163,59 +169,61 @@ const vendasCompletas: Venda[] = vendasData.map((venda) => ({
   };
 
   // Handles the manual campaign sending process.
-const handleManualSend = async () => {
-  if (selectedVendaIds.length === 0) {
-    toast({
-      title: "Nenhuma venda selecionada",
-      description: "Por favor, selecione ao menos uma venda para o envio.",
-      variant: "destructive",
+  const handleManualSend = async () => {
+    if (selectedVendaIds.length === 0) {
+      toast({
+        title: "Nenhuma venda selecionada",
+        description: "Por favor, selecione ao menos uma venda para o envio.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!campaign || !user?.id || !user.empresaId) {
+      toast({
+        title: "Erro de Autenticação",
+        description:
+          "Dados da campanha ou do usuário não encontrados. Faça login novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+
+    const sendPromises = selectedVendaIds.map((vendaId) => {
+      const venda = vendas.find((v) => v.id === vendaId);
+      console.log("[VENDA ENVIADA]", venda.id);
+      if (!venda) return Promise.resolve();
+
+      const payload = {
+        vendaId: venda.id, // ID da venda enviado no JSON
+        empresaId: user.empresaId,
+        campanhaId: campaign.id,
+      };
+
+      return api.post("/envio/individual", payload); // API espera o JSON, não URL
     });
-    return;
-  }
 
-  if (!campaign || !user?.id || !user.empresaId) {
-    toast({
-      title: "Erro de Autenticação",
-      description: "Dados da campanha ou do usuário não encontrados. Faça login novamente.",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  setIsSending(true);
-
-  const sendPromises = selectedVendaIds.map((vendaId) => {
-    const venda = vendas.find(v => v.id === vendaId);
-    if (!venda) return Promise.resolve();
-
-    const payload = {
-      vendaId: venda.id,          // ID da venda enviado no JSON
-      empresaId: user.empresaId,
-      campanhaId: campaign.id
-    };
-
-    return api.post("/envio/individual", payload); // API espera o JSON, não URL
-  });
-
-  try {
-    await Promise.all(sendPromises);
-    toast({
-      title: "Envio Concluído!",
-      description: `Campanha "${campaign.titulo}" enviada para ${selectedVendaIds.length} venda(s).`,
-    });
-    onOpenChange(false);
-  } catch (error) {
-    console.error("Erro no envio em massa:", error);
-    toast({
-      title: "Erro no Envio",
-      description: "Ocorreu um erro ao enviar a campanha para uma ou mais vendas.",
-      variant: "destructive",
-    });
-  } finally {
-    setIsSending(false);
-  }
-};
-
+    try {
+      await Promise.all(sendPromises);
+      toast({
+        title: "Envio Concluído!",
+        description: `Campanha "${campaign.titulo}" enviada para ${selectedVendaIds.length} venda(s).`,
+      });
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Erro no envio em massa:", error);
+      toast({
+        title: "Erro no Envio",
+        description:
+          "Ocorreu um erro ao enviar a campanha para uma ou mais vendas.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -226,7 +234,8 @@ const handleManualSend = async () => {
             Selecione as vendas para enviar a campanha{" "}
             <span className="font-semibold text-primary">
               "{campaign?.titulo}"
-            </span>.
+            </span>
+            .
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
@@ -272,12 +281,10 @@ const handleManualSend = async () => {
                         );
                       }}
                     />
-                    <Label
-                      htmlFor={venda.id}
-                      className="w-full cursor-pointer"
-                    >
+                    <Label htmlFor={venda.id} className="w-full cursor-pointer">
                       {/* --- FIX: Use optional chaining for produto.nome --- */}
-                      {venda.cliente?.pessoa?.nome || "Cliente desconhecido"} - {venda.produto?.nome || "Produto desconhecido"}
+                      {venda.cliente?.nome || "Cliente desconhecido"} -{" "}
+                      {venda.produto?.nome || "Produto desconhecido"}
                     </Label>
                   </div>
                 ))}
@@ -299,7 +306,6 @@ const handleManualSend = async () => {
   );
 };
 
-
 // --- MAIN CAMPAIGNS PAGE COMPONENT ---
 export const CampaignsPage = () => {
   const { campaigns, addCampaign, updateCampaign, deleteCampaign, loading } =
@@ -318,14 +324,17 @@ export const CampaignsPage = () => {
   }>({ isOpen: false, campaign: null });
 
   // State for the new campaign creation form
-  const [newCampaign, setNewCampaign] = useState<Omit<NewCampaignData, "formularioId" | "empresaId">>({
+  const [newCampaign, setNewCampaign] = useState<
+    Omit<NewCampaignData, "formularioId" | "empresaId">
+  >({
     titulo: "",
     descricao: "",
     canalEnvio: "EMAIL",
     tipoCampanha: "POS_COMPRA",
     segmentoAlvo: "TODOS_CLIENTES",
     dataFim: new Date().toISOString(),
-    templateMensagem: "",
+    templateMensagem:
+      "Olá [Nome do Cliente],\n\nEsperamos que você esteja aproveitando o [Nome do Produto].\nGostaríamos de saber: o produto atendeu às suas expectativas?\nSua avaliação nos ajuda a melhorar e oferecer sempre o melhor para você.\nPor favor, deixe seu feedback no link abaixo:\n\nAgradecemos pela sua confiança!\n\nAtenciosamente, \n[Nome da Empresa]",
   });
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
 
@@ -345,7 +354,8 @@ export const CampaignsPage = () => {
     if (formularios.length === 0) {
       toast({
         title: "Nenhum formulário encontrado",
-        description: "É necessário criar um formulário antes de criar uma campanha.",
+        description:
+          "É necessário criar um formulário antes de criar uma campanha.",
         variant: "destructive",
       });
       navigate("/form-builder");
@@ -356,7 +366,11 @@ export const CampaignsPage = () => {
 
   // Handles the creation of a new campaign
   const handleCreateCampaign = async () => {
-    if (!newCampaign.titulo.trim() || !newCampaign.templateMensagem.trim() || !selectedFormId) {
+    if (
+      !newCampaign.titulo.trim() ||
+      !newCampaign.templateMensagem.trim() ||
+      !selectedFormId
+    ) {
       toast({
         title: "Erro",
         description: "Título, template e um formulário são obrigatórios.",
@@ -366,7 +380,7 @@ export const CampaignsPage = () => {
     }
 
     // The context will add the 'empresaId' automatically
-    const payload: Omit<NewCampaignData, 'empresaId'> = {
+    const payload: Omit<NewCampaignData, "empresaId"> = {
       ...newCampaign,
       formularioId: selectedFormId,
     };
@@ -411,20 +425,24 @@ export const CampaignsPage = () => {
   // Helper to render the status badge
   const getStatusBadge = (ativo: boolean) => {
     return ativo ? (
-      <Badge className="bg-green-500 text-white hover:bg-green-600">Ativa</Badge>
+      <Badge className="bg-green-500 text-white hover:bg-green-600">
+        Ativa
+      </Badge>
     ) : (
       <Badge variant="secondary">Inativa</Badge>
     );
   };
 
   // Helper to safely format dates
-  const formatDateSafe = (date: string | Date | null | undefined, formatString: string) => {
+  const formatDateSafe = (
+    date: string | Date | null | undefined,
+    formatString: string
+  ) => {
     if (!date) return "N/A";
     const dateObj = new Date(date);
     if (!isValid(dateObj)) return "Data Inválida";
     return format(dateObj, formatString);
   };
-
 
   return (
     <div className="space-y-6 p-4 md:p-8 mt-8">
@@ -470,10 +488,14 @@ export const CampaignsPage = () => {
                   <div className="flex items-start justify-between flex-wrap">
                     <div className="flex-grow">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-lg">{campaign.titulo}</h3>
+                        <h3 className="font-semibold text-lg">
+                          {campaign.titulo}
+                        </h3>
                         {getStatusBadge(campaign.ativo)}
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">{campaign.descricao}</p>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {campaign.descricao}
+                      </p>
                       <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap mb-2">
                         <span>Tipo: {campaign.tipoCampanha}</span>
                         <span>Segmento: {campaign.segmentoAlvo}</span>
@@ -484,14 +506,19 @@ export const CampaignsPage = () => {
                       </div>
                     </div>
                     <div className="flex gap-2 flex-wrap">
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            title="Envio Manual"
-                            onClick={() => setManualSendState({ isOpen: true, campaign: campaign })}
-                        >
-                            <Send className="w-3 h-3" />
-                        </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        title="Envio Manual"
+                        onClick={() =>
+                          setManualSendState({
+                            isOpen: true,
+                            campaign: campaign,
+                          })
+                        }
+                      >
+                        <Send className="w-3 h-3" />
+                      </Button>
                       {campaign.ativo ? (
                         <Button
                           size="sm"
@@ -570,7 +597,10 @@ export const CampaignsPage = () => {
             </div>
             <div>
               <Label htmlFor="form">Formulário *</Label>
-              <Select onValueChange={setSelectedFormId} value={selectedFormId || ''}>
+              <Select
+                onValueChange={setSelectedFormId}
+                value={selectedFormId || ""}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um formulário..." />
                 </SelectTrigger>
@@ -592,7 +622,9 @@ export const CampaignsPage = () => {
                     setNewCampaign({ ...newCampaign, tipoCampanha: v })
                   }
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="POS_COMPRA">Pós-Compra</SelectItem>
                     <SelectItem value="AUTOMATICO">Automático</SelectItem>
@@ -609,12 +641,20 @@ export const CampaignsPage = () => {
                     setNewCampaign({ ...newCampaign, segmentoAlvo: v })
                   }
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="TODOS_CLIENTES">Todos</SelectItem>
-                    <SelectItem value="CLIENTES_REGULARES">Clientes Regulares</SelectItem>
-                    <SelectItem value="NOVOS_CLIENTES">Novos Clientes</SelectItem>
-                    <SelectItem value="CLIENTES_PREMIUM">Clientes Premium</SelectItem>
+                    <SelectItem value="CLIENTES_REGULARES">
+                      Clientes Regulares
+                    </SelectItem>
+                    <SelectItem value="NOVOS_CLIENTES">
+                      Novos Clientes
+                    </SelectItem>
+                    <SelectItem value="CLIENTES_PREMIUM">
+                      Clientes Premium
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -624,7 +664,12 @@ export const CampaignsPage = () => {
                 <Label>Data de Fim</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal")}>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal"
+                      )}
+                    >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {formatDateSafe(newCampaign.dataFim, "dd/MM/yyyy")}
                     </Button>
@@ -633,7 +678,13 @@ export const CampaignsPage = () => {
                     <Calendar
                       mode="single"
                       selected={new Date(newCampaign.dataFim)}
-                      onSelect={(date) => date && setNewCampaign({ ...newCampaign, dataFim: date.toISOString() })}
+                      onSelect={(date) =>
+                        date &&
+                        setNewCampaign({
+                          ...newCampaign,
+                          dataFim: date.toISOString(),
+                        })
+                      }
                       initialFocus
                       locale={ptBR}
                     />
@@ -642,17 +693,24 @@ export const CampaignsPage = () => {
               </div>
             </div>
             <div className="col-span-2">
-                <Label htmlFor="channel">Canal de Envio</Label>
-                <Select
-                    value={newCampaign.canalEnvio}
-                    onValueChange={(v) => setNewCampaign({ ...newCampaign, canalEnvio: v as "EMAIL" | "WHATSAPP" })}
-                >
-                    <SelectTrigger><SelectValue placeholder="Selecione um canal..." /></SelectTrigger>
-                    <SelectContent>
-                    <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
-                    <SelectItem value="EMAIL">Email</SelectItem>
-                    </SelectContent>
-                </Select>
+              <Label htmlFor="channel">Canal de Envio</Label>
+              <Select
+                value={newCampaign.canalEnvio}
+                onValueChange={(v) =>
+                  setNewCampaign({
+                    ...newCampaign,
+                    canalEnvio: v as "EMAIL" | "WHATSAPP",
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um canal..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
+                  <SelectItem value="EMAIL">Email</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="col-span-2">
               <Label htmlFor="template">Template da Mensagem *</Label>
@@ -667,8 +725,19 @@ export const CampaignsPage = () => {
                 }
               />
             </div>
+            <p className="text-600 text-sm bg-slate-100">
+              Crie sua mensagem usando os placeholders <span className="text-orange-600">[Nome do Cliente]</span>, <span className="text-orange-600">
+                [Nome
+                do Produto]
+              </span> e <span className="text-orange-600">[Nome da Empresa]</span>; eles serão substituídos
+              automaticamente pelos dados reais.
+            </p>
+
             <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsCreateDialogOpen(false)}
+              >
                 Cancelar
               </Button>
               <Button onClick={handleCreateCampaign}>Criar Campanha</Button>
@@ -695,8 +764,13 @@ export const CampaignsPage = () => {
               {/* ... (rest of the edit form fields) ... */}
             </div>
             <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingCampaign(null)}>Cancelar</Button>
-                <Button onClick={handleUpdateCampaign}>Salvar Alterações</Button>
+              <Button
+                variant="outline"
+                onClick={() => setEditingCampaign(null)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleUpdateCampaign}>Salvar Alterações</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

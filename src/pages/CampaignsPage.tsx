@@ -52,23 +52,28 @@ import {
 import { Checkbox } from "../components/ui/checkbox";
 import { useToast } from "../hooks/use-toast";
 import { cn } from "../lib/utils";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns"; // Import isValid
 import { ptBR } from "date-fns/locale";
 
-// --- INTERFACE FOR CLIENT ---
-// This interface defines the expected structure for a client object.
-interface Cliente {
+// --- NEW INTERFACE FOR SALE (VENDA) ---
+interface Venda {
   id: string;
-  cidade: string;
-  pessoa: {
-    nome: string;
-    email: string;
-    telefone: string;
+  dataVenda: string;
+  cliente: {
+    id: string;
+    pessoa?: {
+      nome: string;
+    };
   };
+  produto: {
+    id: string;
+    nome: string;
+  };
+  empresaId: string;
 }
 
 // --- MANUAL SEND MODAL COMPONENT ---
-// This component handles the manual sending of a campaign to selected clients.
+// This component handles the manual sending of a campaign to selected sales.
 const ManualSendModal = ({
   isOpen,
   onOpenChange,
@@ -78,71 +83,96 @@ const ManualSendModal = ({
   onOpenChange: (open: boolean) => void;
   campaign: Campanha | null;
 }) => {
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
-  const [loadingClients, setLoadingClients] = useState(false);
+  const [vendas, setVendas] = useState<Venda[]>([]);
+  const [selectedVendaIds, setSelectedVendaIds] = useState<string[]>([]);
+  const [loadingVendas, setLoadingVendas] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth(); // Use AuthContext for user data
+  const userString = localStorage.getItem("user");
+let empresaId: string | null = null;
 
-  // Fetches clients from the API when the modal is opened.
-  useEffect(() => {
-    if (isOpen && user?.empresaId) {
-      const fetchClients = async () => {
-        setLoadingClients(true);
-        try {
-          // Fetch clients associated with the user's company
-          const response = await api.get(`/clientes?empresaId=${user.empresaId}`);
-          setClientes(response.data);
-        } catch (error) {
-          console.error("Erro ao buscar clientes:", error);
-          toast({
-            title: "Erro",
-            description: "Não foi possível carregar a lista de clientes.",
-            variant: "destructive",
-          });
-        } finally {
-          setLoadingClients(false);
-        }
-      };
-      fetchClients();
-    } else {
-      // Clears state when the modal is closed.
-      setSelectedClientIds([]);
-      setSearchTerm("");
-    }
-  }, [isOpen, user?.empresaId, toast]);
+if (userString) {
+  const user = JSON.parse(userString);
+  empresaId = user.empresaId; // só pega o ID da empresa
+}
 
-  // Filters clients based on the search term.
-  const filteredClients = useMemo(() => {
-    return clientes.filter((client) =>
-      (client.pessoa.nome || "")
+
+  // Fetches sales from the API when the modal is opened.
+useEffect(() => {
+  if (isOpen && empresaId) {
+    const fetchVendas = async () => {
+      setLoadingVendas(true);
+      try {
+        // Busca vendas
+        const vendasResponse = await api.get(`/vendas?empresaId=${empresaId}`);
+        const vendasData: Venda[] = vendasResponse.data;
+
+        // Busca clientes e produtos
+        const clientesResponse = await api.get(`/clientes?empresaId=${empresaId}`);
+        const produtosResponse = await api.get(`/produtos?empresaId=${empresaId}`);
+
+        const clientes = clientesResponse.data;
+        const produtos = produtosResponse.data;
+
+        // Mapeia vendas com dados completos
+        const vendasCompletas = vendasData.map((venda) => ({
+          ...venda,
+          cliente: clientes.find((c) => c.id === venda.clienteId),
+          produto: produtos.find((p) => p.id === venda.produtoId),
+        }));
+
+        setVendas(vendasCompletas);
+      } catch (error) {
+        console.error("Erro ao buscar vendas:", error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar a lista de vendas.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingVendas(false);
+      }
+    };
+
+    fetchVendas();
+  } else {
+    // limpa estado quando fecha
+    setSelectedVendaIds([]);
+    setSearchTerm("");
+  }
+}, [isOpen, empresaId, toast]);
+
+
+  // Filters sales based on the search term (client name).
+  const filteredVendas = useMemo(() => {
+    return vendas.filter((venda) =>
+      (venda.cliente?.pessoa?.nome || "")
         .toLowerCase()
         .includes(searchTerm.toLowerCase())
     );
-  }, [clientes, searchTerm]);
+  }, [vendas, searchTerm]);
 
   // Handles the "Select All" checkbox functionality.
   const handleSelectAll = (checked: boolean | "indeterminate") => {
     if (checked === true) {
-      setSelectedClientIds(filteredClients.map((c) => c.id));
+      setSelectedVendaIds(filteredVendas.map((v) => v.id));
     } else {
-      setSelectedClientIds([]);
+      setSelectedVendaIds([]);
     }
   };
 
   // Handles the manual campaign sending process.
   const handleManualSend = async () => {
-    if (selectedClientIds.length === 0) {
+    if (selectedVendaIds.length === 0) {
       toast({
-        title: "Nenhum cliente selecionado",
-        description: "Por favor, selecione ao menos um cliente para o envio.",
+        title: "Nenhuma venda selecionada",
+        description: "Por favor, selecione ao menos uma venda para o envio.",
         variant: "destructive",
       });
       return;
     }
-    if (!campaign || !user?.id) {
+    if (!campaign || !empresaId) {
         toast({
             title: "Erro de Autenticação",
             description: "Dados da campanha ou do usuário não encontrados. Faça login novamente.",
@@ -152,30 +182,32 @@ const ManualSendModal = ({
     }
 
     setIsSending(true);
-    // Creates an array of promises for sending the campaign to each selected client.
-    const sendPromises = selectedClientIds.map((clienteId) =>
-      api.post("/envio/individual", {
-        clienteId,
-        campanhaId: campaign.id,
-        usuarioId: user.id,
-        // Note: produtoId is hardcoded as per the original snippet.
-        // This might need to be dynamic in a real-world scenario.
-        produtoId: '0fc05882-6edf-4769-a382-d410e8803ccf'
-      })
-    );
+    const sendPromises = selectedVendaIds.map((vendaId) => {
+        const venda = vendas.find(v => v.id === vendaId);
+        if (!venda) return Promise.resolve(); // Skip if sale not found
+
+        const payload = {
+            clienteId: venda.cliente.id,
+            campanhaId: campaign.id,
+            empresaId: empresaId,
+            produtoId: venda.produto.id,
+        };
+        // The sale ID is now passed in the URL
+        return api.post(`/envio/individual/${venda.id}`, payload);
+    });
 
     try {
       await Promise.all(sendPromises);
       toast({
         title: "Envio Concluído!",
-        description: `Campanha "${campaign.titulo}" enviada para ${selectedClientIds.length} cliente(s).`,
+        description: `Campanha "${campaign.titulo}" enviada para ${selectedVendaIds.length} venda(s).`,
       });
-      onOpenChange(false); // Close modal on success
+      onOpenChange(false);
     } catch (error) {
       console.error("Erro no envio em massa:", error);
       toast({
         title: "Erro no Envio",
-        description: "Ocorreu um erro ao enviar a campanha para um ou mais clientes.",
+        description: "Ocorreu um erro ao enviar a campanha para uma ou mais vendas.",
         variant: "destructive",
       });
     } finally {
@@ -189,7 +221,7 @@ const ManualSendModal = ({
         <DialogHeader>
           <DialogTitle>Envio Manual de Campanha</DialogTitle>
           <DialogDescription>
-            Selecione os clientes para enviar a campanha{" "}
+            Selecione as vendas para enviar a campanha{" "}
             <span className="font-semibold text-primary">
               "{campaign?.titulo}"
             </span>.
@@ -197,13 +229,13 @@ const ManualSendModal = ({
         </DialogHeader>
         <div className="py-4 space-y-4">
           <Input
-            placeholder="Buscar cliente por nome..."
+            placeholder="Buscar venda por nome do cliente..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="mb-4"
           />
           <div className="space-y-2 max-h-64 overflow-y-auto border rounded-md p-2">
-            {loadingClients ? (
+            {loadingVendas ? (
               <div className="flex justify-center items-center h-24">
                 <Loader2 className="animate-spin" />
               </div>
@@ -211,39 +243,37 @@ const ManualSendModal = ({
               <>
                 <div className="flex items-center space-x-2 p-2">
                   <Checkbox
-                    id="select-all"
+                    id="select-all-vendas"
                     onCheckedChange={handleSelectAll}
                     checked={
-                      filteredClients.length > 0 &&
-                      selectedClientIds.length === filteredClients.length
+                      filteredVendas.length > 0 &&
+                      selectedVendaIds.length === filteredVendas.length
                     }
                   />
-                  <Label htmlFor="select-all" className="font-semibold">
-                    Selecionar Todos
+                  <Label htmlFor="select-all-vendas" className="font-semibold">
+                    Selecionar Todas
                   </Label>
                 </div>
-                {filteredClients.map((client) => (
+                {filteredVendas.map((venda) => (
                   <div
-                    key={client.id}
+                    key={venda.id}
                     className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50"
                   >
                     <Checkbox
-                      id={client.id}
-                      checked={selectedClientIds.includes(client.id)}
+                      id={venda.id}
+                      checked={selectedVendaIds.includes(venda.id)}
                       onCheckedChange={(checked) => {
-                        setSelectedClientIds((prev) =>
+                        setSelectedVendaIds((prev) =>
                           checked
-                            ? [...prev, client.id]
-                            : prev.filter((id) => id !== client.id)
+                            ? [...prev, venda.id]
+                            : prev.filter((id) => id !== venda.id)
                         );
                       }}
                     />
-                    <Label
-                      htmlFor={client.id}
-                      className="w-full cursor-pointer"
-                    >
-                      {client.pessoa.nome}
-                    </Label>
+<Label htmlFor={venda.id} className="w-full cursor-pointer">
+  {venda.cliente?.pessoa?.nome || "Cliente desconhecido"} - {venda.produto?.nome || "Produto desconhecido"}
+</Label>
+
                   </div>
                 ))}
               </>
@@ -256,7 +286,7 @@ const ManualSendModal = ({
           </Button>
           <Button onClick={handleManualSend} disabled={isSending}>
             {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Enviar para ({selectedClientIds.length})
+            Enviar para ({selectedVendaIds.length})
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -289,7 +319,6 @@ export const CampaignsPage = () => {
     canalEnvio: "EMAIL",
     tipoCampanha: "POS_COMPRA",
     segmentoAlvo: "TODOS_CLIENTES",
-    dataInicio: new Date().toISOString(),
     dataFim: new Date().toISOString(),
     templateMensagem: "",
   });
@@ -347,7 +376,6 @@ export const CampaignsPage = () => {
         tipoCampanha: "POS_COMPRA",
         canalEnvio: "EMAIL",
         segmentoAlvo: "TODOS_CLIENTES",
-        dataInicio: new Date().toISOString(),
         dataFim: new Date().toISOString(),
         templateMensagem: "",
       });
@@ -383,6 +411,15 @@ export const CampaignsPage = () => {
       <Badge variant="secondary">Inativa</Badge>
     );
   };
+
+  // Helper to safely format dates
+  const formatDateSafe = (date: string | Date | null | undefined, formatString: string) => {
+    if (!date) return "N/A";
+    const dateObj = new Date(date);
+    if (!isValid(dateObj)) return "Data Inválida";
+    return format(dateObj, formatString);
+  };
+
 
   return (
     <div className="space-y-6 p-4 md:p-8 mt-8">
@@ -437,8 +474,7 @@ export const CampaignsPage = () => {
                         <span>Segmento: {campaign.segmentoAlvo}</span>
                         <span>
                           Período:{" "}
-                          {format(new Date(campaign.dataInicio), "dd/MM/yy")} -{" "}
-                          {format(new Date(campaign.dataFim), "dd/MM/yy")}
+                          {formatDateSafe(campaign.dataFim, "dd/MM/yy")}
                         </span>
                       </div>
                     </div>
@@ -451,40 +487,40 @@ export const CampaignsPage = () => {
                         >
                             <Send className="w-3 h-3" />
                         </Button>
-                        {campaign.ativo ? (
+                      {campaign.ativo ? (
                         <Button
-                            size="sm"
-                            variant="secondary"
-                            title="Pausar Campanha"
-                            onClick={() => handleToggleCampaignStatus(campaign)}
+                          size="sm"
+                          variant="secondary"
+                          title="Pausar Campanha"
+                          onClick={() => handleToggleCampaignStatus(campaign)}
                         >
-                            <Pause className="w-3 h-3" />
+                          <Pause className="w-3 h-3" />
                         </Button>
-                        ) : (
+                      ) : (
                         <Button
-                            size="sm"
-                            title="Iniciar Campanha"
-                            onClick={() => handleToggleCampaignStatus(campaign)}
+                          size="sm"
+                          title="Iniciar Campanha"
+                          onClick={() => handleToggleCampaignStatus(campaign)}
                         >
-                            <Play className="w-3 h-3" />
+                          <Play className="w-3 h-3" />
                         </Button>
-                        )}
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            title="Editar Campanha"
-                            onClick={() => setEditingCampaign(campaign)}
-                        >
-                            <Edit className="w-3 h-3" />
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="destructive"
-                            title="Desativar Campanha"
-                            onClick={() => handleDeleteCampaign(campaign.id)}
-                        >
-                            <Trash2 className="w-3 h-3" />
-                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        title="Editar Campanha"
+                        onClick={() => setEditingCampaign(campaign)}
+                      >
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        title="Desativar Campanha"
+                        onClick={() => handleDeleteCampaign(campaign.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -580,32 +616,12 @@ export const CampaignsPage = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Data de Início</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(new Date(newCampaign.dataInicio), "dd/MM/yyyy", { locale: ptBR })}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={new Date(newCampaign.dataInicio)}
-                      onSelect={(date) => date && setNewCampaign({ ...newCampaign, dataInicio: date.toISOString() })}
-                      initialFocus
-                      locale={ptBR}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
                 <Label>Data de Fim</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className={cn("w-full justify-start text-left font-normal")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(new Date(newCampaign.dataFim), "dd/MM/yyyy", { locale: ptBR })}
+                      {formatDateSafe(newCampaign.dataFim, "dd/MM/yyyy")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">

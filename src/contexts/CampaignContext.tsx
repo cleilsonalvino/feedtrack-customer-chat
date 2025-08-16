@@ -13,7 +13,6 @@ export interface Campanha {
   tipoCampanha: string;
   segmentoAlvo: string;
   canalEnvio: string;
-  dataInicio: string;
   dataFim: string;
   templateMensagem: string;
   formularioId: string;
@@ -21,7 +20,7 @@ export interface Campanha {
   empresaId: string; // agora obrigatório
 }
 
-export type NewCampaignData = Omit<Campanha, 'id' | 'ativo'>;
+export type NewCampaignData = Omit<Campanha, 'id' | 'ativo' | 'dataInicio'>;
 
 interface CampaignContextType {
   campaigns: Campanha[];
@@ -43,13 +42,21 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth(); // usuário logado
 
   const fetchCampaigns = async () => {
-    if (!user?.empresaId) return;
+    console.log('CampaignContext: fetchCampaigns called');
+    console.log('CampaignContext: user in fetchCampaigns', user);
+    if (!user?.empresaId) {
+      console.log('CampaignContext: empresaId is missing, not fetching campaigns.');
+      setLoading(false); // Ensure loading is set to false if not fetching
+      return;
+    }
     try {
       setLoading(true);
+      console.log(`CampaignContext: Fetching campaigns for empresaId: ${user.empresaId}`);
       const response = await api.get(`/campanhas?empresaId=${user.empresaId}`);
       setCampaigns(response.data);
+      console.log('CampaignContext: Campaigns fetched successfully', response.data);
     } catch (error) {
-      console.error("Erro ao buscar campanhas:", error);
+      console.error("CampaignContext: Erro ao buscar campanhas:", error);
       toast({
         title: "Erro de Rede",
         description: "Não foi possível carregar as campanhas.",
@@ -61,13 +68,41 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    console.log('CampaignContext: useEffect triggered');
     fetchCampaigns();
   }, [user?.empresaId]);
 
   const addCampaign = async (campaignData: NewCampaignData) => {
     if (!user?.empresaId) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day
+    const dataFim = new Date(campaignData.dataFim);
+
+    if (dataFim < today) {
+      toast({
+        title: "Erro",
+        description: "A Data Fim da campanha não pode ser anterior à data atual.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      const payload = { ...campaignData, empresaId: user.empresaId };
+      const empresaId = user?.empresaId || localStorage.getItem("user");
+      console.log("EmpresaId", empresaId)
+if (!empresaId) {
+  toast({
+    title: "Erro",
+    description: "Empresa não encontrada.",
+    variant: "destructive",
+  });
+  return;
+}
+
+const payload = { ...campaignData, empresaId };
+
+
       const response = await api.post('/campanha', payload);
       const newCampaign = response.data;
       await fetchCampaigns();
@@ -86,6 +121,20 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Erro", description: "Campanha não encontrada para atualizar.", variant: "destructive" });
       return;
     }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day
+    const dataFim = new Date(campaignData.dataFim || campaignToUpdate.dataFim);
+
+    if (dataFim < today) {
+      toast({
+        title: "Erro",
+        description: "A Data Fim da campanha não pode ser anterior à data atual.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const updatedLocalCampaign = { ...campaignToUpdate, ...campaignData, empresaId: user.empresaId };
 
     try {

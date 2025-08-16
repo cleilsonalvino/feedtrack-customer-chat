@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import api from "../lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext"; // assumindo que você tem esse hook
+import { useAuth } from "@/contexts/AuthContext";
 
 // --- INTERFACES ---
 export interface Pergunta {
@@ -16,7 +16,7 @@ export interface Pergunta {
   tipo: "nota" | "texto" | "multipla_escolha";
   opcoes?: string[];
   ativo?: boolean;
-  empresaId?: string; // agora obrigatório
+  empresaId?: string;
   dataCriacao?: string;
   dataAtualizacao?: string;
 }
@@ -26,7 +26,7 @@ export interface Formulario {
   titulo: string;
   descricao: string;
   ativo: boolean;
-  empresaId?: string; // agora obrigatório
+  empresaId?: string;
   perguntas: Pergunta[];
 }
 
@@ -62,14 +62,14 @@ const FormContext = createContext<FormContextType | undefined>(undefined);
 const mapApiFormToFormulario = (apiForm: any): Formulario => ({
   ...apiForm,
   perguntas: (apiForm.perguntas || []).map((p: any) => ({
-    id: p.id || p._id,
-    texto: p.texto || p._texto,
-    tipo: p.tipo || p._tipo,
-    opcoes: p.opcoes || p._opcoes,
-    ativo: p.ativo ?? p._ativo,
-    empresaId: p.empresaId ?? p._empresaId,
-    dataCriacao: p.dataCriacao || p._dataCriacao,
-    dataAtualizacao: p.dataAtualizacao || p._dataAtualizacao,
+    id: p.id,
+    texto: p.texto,
+    tipo: p.tipo,
+    opcoes: p.opcoes,
+    ativo: p.ativo,
+    empresaId: p.empresaId,
+    dataCriacao: p.dataCriacao,
+    dataAtualizacao: p.dataAtualizacao,
   })),
 });
 
@@ -80,11 +80,10 @@ export const FormProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
-  const storedUser = localStorage.getItem("user");
-const parsedUser = storedUser ? JSON.parse(storedUser) : null;
-const empresaId = parsedUser?.empresaId;
-console.log(empresaId)
 
+  const storedUser = localStorage.getItem("user");
+  const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+  const empresaId = parsedUser?.empresaId;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -142,21 +141,20 @@ console.log(empresaId)
     }
   };
 
-const addQuestion = async (questionData: NewQuestionData) => {
-  if (!empresaId) return;
-  try {
-    const payload = { ...questionData, empresaId };
-    const response = await api.post("/pergunta", payload);
-    const newQuestion = response.data;
-    setPerguntas((current) => [...current, newQuestion]);
-    toast({ title: "Sucesso", description: "Pergunta adicionada!" });
-    return newQuestion;
-  } catch (error) {
-    console.error("Erro ao criar pergunta:", error);
-    toast({ title: "Erro", description: "Não foi possível criar a pergunta.", variant: "destructive" });
-  }
-};
-
+  const addQuestion = async (questionData: NewQuestionData) => {
+    if (!empresaId) return;
+    try {
+      const payload = { ...questionData, empresaId };
+      const response = await api.post("/pergunta", payload);
+      const newQuestion = response.data;
+      setPerguntas((current) => [...current, newQuestion]);
+      toast({ title: "Sucesso", description: "Pergunta adicionada!" });
+      return newQuestion;
+    } catch (error) {
+      console.error("Erro ao criar pergunta:", error);
+      toast({ title: "Erro", description: "Não foi possível criar a pergunta.", variant: "destructive" });
+    }
+  };
 
   const deleteForm = async (formId: string) => {
     try {

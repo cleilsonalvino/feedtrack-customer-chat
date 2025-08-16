@@ -53,24 +53,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setLoading(false);
   }, []);
 
-  const login = async (nomeUsuario: string, senha: string) => {
-    try {
-      const response = await api.post("/login", { nomeUsuario, senha });
-      const usuario: User = response.data;
+const login = async (nomeUsuario: string, senha: string) => {
+  try {
+    const response = await api.post("/login", { nomeUsuario, senha });
+    const usuario: User = response.data;
 
-      if (usuario.empresaId) {
-        const empresaRes = await api.get(`/empresa/${usuario.empresaId}`);
-        const empresa: UserEmpresa = empresaRes.data;
-        setUserEmpresa(empresa);
-        localStorage.setItem("userEmpresa", JSON.stringify(empresa));
-      } else {
-        setUserEmpresa(null);
-        localStorage.removeItem("userEmpresa");
-      }
-    } catch (error: any) {
-      throw new Error("Falha no login: " + (error.response?.data?.message || error.message));
+    // SALVA O USER
+    setUser(usuario);
+    localStorage.setItem("user", JSON.stringify(usuario));
+
+    if (usuario.empresaId) {
+      const empresaRes = await api.get(`/empresa/${usuario.empresaId}`);
+      const empresa: UserEmpresa = empresaRes.data;
+      setUserEmpresa(empresa);
+      localStorage.setItem("userEmpresa", JSON.stringify(empresa));
+    } else {
+      setUserEmpresa(null);
+      localStorage.removeItem("userEmpresa");
     }
-  };
+  } catch (error: any) {
+    throw new Error("Falha no login: " + (error.response?.data?.message || error.message));
+  }
+};
+
 
   const register = async (data: { nome: string; cnpj?: string; email: string; plano: string }) => {
     try {

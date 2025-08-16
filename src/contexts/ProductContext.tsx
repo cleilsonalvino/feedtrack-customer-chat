@@ -155,13 +155,13 @@ const addProduct = async (productData: NewProductData, showToast = true) => {
     const product = products.find(p => p.id === id);
     if (!product) return;
 
-    const deactivatedProduct: Product = {
-      ...product,
-      ativo: false,
-      dataExclusao: new Date().toISOString(),
-    };
+    const data = await api.delete(`/deletar-produto/${id}`);
     
-    await updateProduct(deactivatedProduct);
+    setProducts(current => current.filter(p => p.id !== id));
+
+    
+
+    
     toast({ title: "Produto Desativado", description: `"${product.nome}" foi movido para os inativos.` });
   };
 

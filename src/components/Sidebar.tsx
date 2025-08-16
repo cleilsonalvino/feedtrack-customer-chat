@@ -8,6 +8,7 @@ import {
   LogOut,
   Star,
   FolderKanban,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +20,7 @@ const getNavigation = (isAdmin: boolean) => {
     { name: "Campanhas", href: "/campaigns", icon: MessageSquare },
     { name: "Feedbacks", href: "/feedbacks", icon: Star },
     { name: "Produtos", href: "/products", icon: Star },
+    { name: "Vendas", href: "/sales", icon: DollarSign },
   ];
 
   const adminNavigation = [

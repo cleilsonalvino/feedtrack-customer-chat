@@ -1,15 +1,7 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-} from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import api from "../lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-
-// --- INTERFACES ---
 
 export interface Customer {
   id: string;
@@ -18,7 +10,7 @@ export interface Customer {
   telefone: string;
   cidade: string;
   status: string;
-  empresaId: string; // agora obrigatório
+  empresaId: string;
   dataCriacao?: string;
   dataAtualizacao?: string;
   dataExclusao?: string | null;
@@ -31,31 +23,29 @@ export type NewCustomerData = {
   cidade: string;
 };
 
-// --- CONTEXT TYPE ---
 interface CustomerContextType {
   customers: Customer[];
   loading: boolean;
-  addCustomer: (newCustomerData: NewCustomerData) => Promise<Customer | void>;
-  updateCustomer: (
-    updatedCustomer: Omit<Customer, "produtos">
-  ) => Promise<void>;
+  addCustomer: (data: NewCustomerData) => Promise<Customer | void>;
+  updateCustomer: (customer: Omit<Customer, "produtos">) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   fetchCustomers: () => Promise<void>;
 }
 
-const CustomerContext = createContext<CustomerContextType | undefined>(
-  undefined
-);
+const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
 
-// --- PROVIDER COMPONENT ---
 export const CustomerProvider = ({ children }: { children: ReactNode }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { user } = useAuth(); // ✅ pega o usuário logado do AuthContext
+  const { user } = useAuth();
 
   const fetchCustomers = async () => {
-    if (!user?.empresaId) return;
+    if (!user?.empresaId) {
+      setCustomers([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const response = await api.get(`/clientes?empresaId=${user.empresaId}`);
@@ -73,7 +63,9 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    fetchCustomers();
+    if (user?.empresaId) {
+      fetchCustomers();
+    }
   }, [user?.empresaId]);
 
   const addCustomer = async (data: NewCustomerData) => {
@@ -85,25 +77,13 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
       });
       return;
     }
-
     try {
-      const payload = {
-        ...data,
-        empresaId: user.empresaId, // ✅ adiciona empresaId automaticamente
-      };
-
+      const payload = { ...data, empresaId: user.empresaId };
       const response = await api.post("/cliente", payload);
-      const newCustomer = response.data;
-
-      setCustomers((current) => [...current, newCustomer]);
-      toast({
-        title: "Sucesso",
-        description: "Cliente adicionado com sucesso!",
-      });
-
-      return newCustomer;
+      setCustomers((prev) => [...prev, response.data]);
+      toast({ title: "Sucesso", description: "Cliente adicionado!" });
+      return response.data;
     } catch (error: any) {
-      console.error("Erro ao adicionar cliente:", error);
       toast({
         title: "Erro ao Adicionar",
         description: error.message || "Não foi possível criar o cliente.",
@@ -112,17 +92,11 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateCustomer = async (
-    updatedCustomer: Omit<Customer, "produtos">
-  ) => {
+  const updateCustomer = async (updatedCustomer: Omit<Customer, "produtos">) => {
     try {
-      await api.put(
-        `/atualizar-cliente/${updatedCustomer.id}`,
-        updatedCustomer
-      );
+      await api.put(`/atualizar-cliente/${updatedCustomer.id}`, updatedCustomer);
       await fetchCustomers();
     } catch (error) {
-      console.error("Erro ao atualizar cliente:", error);
       toast({
         title: "Erro ao Atualizar",
         description: "Não foi possível salvar as alterações.",
@@ -132,44 +106,25 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  
-
   const deleteCustomer = async (id: string) => {
     const customer = customers.find((c) => c.id === id);
     if (!customer) return;
-
-    const deactivatedCustomer = { ...customer, status: "INATIVO" };
-
-    try {
-      await updateCustomer(deactivatedCustomer);
-      toast({
-        title: "Sucesso",
-        description: `Cliente "${customer.nome}" foi desativado.`,
-      });
-    } catch (error) {
-      // já tratado
-    }
+    const deactivated = { ...customer, status: "INATIVO" };
+    await updateCustomer(deactivated);
+    toast({ title: "Sucesso", description: `Cliente "${customer.nome}" foi desativado.` });
   };
 
   return (
     <CustomerContext.Provider
-      value={{
-        customers,
-        loading,
-        addCustomer,
-        updateCustomer,
-        deleteCustomer,
-        fetchCustomers,
-      }}
+      value={{ customers, loading, addCustomer, updateCustomer, deleteCustomer, fetchCustomers }}
     >
       {children}
     </CustomerContext.Provider>
   );
 };
 
-export const useCustomer = (): CustomerContextType => {
+export const useCustomer = () => {
   const context = useContext(CustomerContext);
-  if (!context)
-    throw new Error("useCustomer must be used within a CustomerProvider");
+  if (!context) throw new Error("useCustomer must be used within CustomerProvider");
   return context;
 };

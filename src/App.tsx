@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { SidebarWrapper } from "./components/SidebarWrapper";
+import { AdminSidebarWrapper } from "./components/AdminSidebarWrapper";
+import AdminPage from "./pages/AdminPage";
 
 import Index from "./pages/Index";
 import { CustomersPage } from "./pages/CustomersPage";
@@ -80,6 +82,11 @@ const App = () => (
                           <Route path="/settings" element={<SettingsPage />} />
                           <Route path="/sales" element={<SalesPage />} />
                           <Route path="*" element={<NotFound />} />
+                        </Route>
+
+                        {/* 🔐 Rotas de Admin */}
+                        <Route element={<AdminSidebarWrapper />}>
+                          <Route path="/admin" element={<AdminPage />} />
                         </Route>
                       </Routes>
                     </BrowserRouter>

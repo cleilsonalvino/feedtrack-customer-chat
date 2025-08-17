@@ -36,9 +36,13 @@ export const Login = () => {
 
     try {
       setLoading(true);
-      await login(usuario, senha);
+      const user = await login(usuario, senha);
       setAlerta({ tipo: "success", mensagem: "Login realizado com sucesso! Redirecionando..." });
-      navigate("/home");
+      if (user.tipo === 'SUPER_ADMIN') {
+        navigate("/admin");
+      } else {
+        navigate("/home");
+      }
     } catch (error) {
       setAlerta({ tipo: "danger", mensagem: "Credenciais inválidas. Verifique seu usuário e senha." });
     } finally {

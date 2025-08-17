@@ -6,7 +6,6 @@ import {
   useFeedBack,
   IFormulario,
   DynamicFeedbackPayload,
-  FuncionarioComNome,
 } from "@/contexts/FeedBackContext";
 
 import { Star, Search, X, Loader2 } from "lucide-react";
@@ -122,8 +121,6 @@ export const FeedbacksPage = () => {
     submitDynamicFeedback,
     loading,
     error: apiError,
-    fetchFuncionariosComNome,
-    funcionarios, 
     
   } = useFeedBack();
   const [alerta, setAlerta] = useState<Alerta | null>(null);
@@ -146,9 +143,6 @@ export const FeedbacksPage = () => {
     fetchFormularios();
   }, [fetchFeedbacks, fetchFormularios]);
 
-useEffect(() => {
-  fetchFuncionariosComNome();
-}, [fetchFuncionariosComNome]);
 
 
 
@@ -157,7 +151,7 @@ useEffect(() => {
   const filteredCustomers = useMemo(() => {
     if (!customerSearchTerm) return [];
     return customers.filter((c) =>
-      c.pessoa.nome.toLowerCase().includes(customerSearchTerm.toLowerCase())
+      c.nome.toLowerCase().includes(customerSearchTerm.toLowerCase())
     );
   }, [customerSearchTerm, customers]);
 
@@ -220,9 +214,8 @@ useEffect(() => {
     }
 
     const payload: DynamicFeedbackPayload = {
-      clienteNome: selectedCustomer.pessoa.nome,
+      clienteNome: selectedCustomer.nome,
       produtoNome: selectedProduct.nome,
-      funcionarioNome: employeeName,
       respostas: selectedForm.perguntas
         .map((p) => {
           const resposta: any = {
@@ -300,7 +293,7 @@ useEffect(() => {
                               }}
                               className="p-2 hover:bg-primary/10 cursor-pointer text-sm"
                             >
-                              {c.pessoa.nome}
+                              {c.nome}
                             </li>
                           ))
                         ) : (
@@ -314,7 +307,7 @@ useEffect(() => {
                 ) : (
                   <div className="p-2 bg-muted rounded-md flex justify-between items-center h-10">
                     <span className="font-medium text-sm">
-                      {selectedCustomer.pessoa.nome}
+                      {selectedCustomer.nome}
                     </span>
                     <Button
                       type="button"
@@ -378,37 +371,6 @@ useEffect(() => {
                   </div>
                 )}
               </div>
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    Atendente
-  </label>
-<Select
-  onValueChange={(id) => {
-    setSelectedFuncionarioId(id);
-    const func = funcionarios.find(f => f.id === id);
-    setEmployeeName(func?.nomeUsuario || "");
-  }}
-  value={selectedFuncionarioId}
-  disabled={funcionarios.length === 0}
->
-  <SelectTrigger>
-    <SelectValue placeholder="Selecione um atendente..."/>
-  </SelectTrigger>
-  <SelectContent>
-    {funcionarios.length === 0 ? (
-      <SelectItem value="loading" disabled>Carregando...</SelectItem>
-
-    ) : (
-      funcionarios.map((func) => (
-        <SelectItem key={func.id} value={func.id}>
-          {func.nomeUsuario || "Nome não encontrado"}
-        </SelectItem>
-      ))
-    )}
-  </SelectContent>
-</Select>
-
-</div>
 
             </div>
 

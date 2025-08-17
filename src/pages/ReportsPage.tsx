@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,17 +15,20 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import api from "../lib/api"; // Ajuste o caminho para sua API
-import { ReportsProvider, useReports } from "@/contexts/RepostsContext"; // Importe o Provider e o Hook
+import api from "../lib/api"; 
+import { ReportsProvider, useReports } from "../contexts/RepostsContext"; // Corrigido o caminho para 'ReportsContext'
 
 // Defina a interface aqui também para o estado inicial
+interface Resposta {
+  tipo: "nota" | "texto";
+  perguntaId: string;
+  nota?: number;
+  resposta_texto?: string;
+}
+
 interface Feedback {
   _id: string;
-  _respostas: {
-    perguntaId: string;
-    tipo: 'nota';
-    nota: number;
-  };
+  _respostas: Resposta[];
   _dataCriacao: string;
   _clienteNome: string;
   _produtoNome: string;
@@ -35,7 +38,6 @@ interface Feedback {
 // Componente de conteúdo que usa o contexto
 const ReportsContent = () => {
   const { toast } = useToast();
-  // Use o hook para obter dados e funções do contexto
   const { 
     reportData, 
     topProducts,
@@ -51,11 +53,11 @@ const ReportsContent = () => {
       title: "Funcionalidade não implementada",
       description: `em breve`
     });
-    // Aqui você pode adicionar a lógica real de exportação usando os dados filtrados
   };
 
   return (
     <div className="space-y-6 mt-16 p-2">
+      {/* ... (código do cabeçalho e filtros permanece o mesmo) ... */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Relatórios e Analytics</h1>
@@ -76,14 +78,8 @@ const ReportsContent = () => {
         </div>
       </div>
 
-      {/* Filtros */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="w-5 h-5" />
-            Filtros do Relatório
-          </CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Filter className="w-5 h-5" />Filtros do Relatório</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -100,7 +96,6 @@ const ReportsContent = () => {
                 </SelectContent>
               </Select>
             </div>
-            
             {selectedPeriod === "custom" && (
               <div>
                 <label className="text-sm font-medium mb-2 block">Data personalizada</label>
@@ -108,29 +103,11 @@ const ReportsContent = () => {
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateRange?.from ? (
-                        dateRange.to ? (
-                          <>
-                            {format(dateRange.from, "dd/MM/y", { locale: ptBR })} -{" "}
-                            {format(dateRange.to, "dd/MM/y", { locale: ptBR })}
-                          </>
-                        ) : (
-                          format(dateRange.from, "dd/MM/y", { locale: ptBR })
-                        )
-                      ) : (
-                        "Selecionar período"
-                      )}
+                      {dateRange?.from ? ( dateRange.to ? ( <> {format(dateRange.from, "dd/MM/y", { locale: ptBR })} -{" "} {format(dateRange.to, "dd/MM/y", { locale: ptBR })} </> ) : ( format(dateRange.from, "dd/MM/y", { locale: ptBR }) ) ) : ( "Selecionar período" )}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      initialFocus
-                      mode="range"
-                      defaultMonth={dateRange?.from}
-                      selected={dateRange}
-                      onSelect={setDateRange}
-                      numberOfMonths={2}
-                    />
+                    <Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2}/>
                   </PopoverContent>
                 </Popover>
               </div>
@@ -139,63 +116,42 @@ const ReportsContent = () => {
         </CardContent>
       </Card>
 
-      {/* Métricas Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* ... (código das métricas e sentimento permanece o mesmo) ... */}
+       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <MessageSquare className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total de Feedbacks</p>
-                <p className="text-2xl font-bold">{reportData.totalFeedbacks.toLocaleString('pt-BR')}</p>
-              </div>
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center"> <MessageSquare className="w-6 h-6 text-primary" /> </div>
+              <div> <p className="text-sm text-muted-foreground">Total de Feedbacks</p> <p className="text-2xl font-bold">{reportData.totalFeedbacks.toLocaleString('pt-BR')}</p> </div>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-warning/10 rounded-lg flex items-center justify-center">
-                <Star className="w-6 h-6 text-warning" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Nota Média</p>
-                <p className="text-2xl font-bold">{reportData.averageRating}</p>
-              </div>
+              <div className="w-12 h-12 bg-warning/10 rounded-lg flex items-center justify-center"> <Star className="w-6 h-6 text-warning" /> </div>
+              <div> <p className="text-sm text-muted-foreground">Nota Média</p> <p className="text-2xl font-bold">{reportData.averageRating}</p> </div>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-success" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Sentimento Positivo</p>
-                <p className="text-2xl font-bold">{reportData.sentiment.positive}%</p>
-              </div>
+              <div className="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center"> <Users className="w-6 h-6 text-success" /> </div>
+              <div> <p className="text-sm text-muted-foreground">Sentimento Positivo</p> <p className="text-2xl font-bold">{reportData.sentiment.positive}%</p> </div>
             </div>
           </CardContent>
         </Card>
-         <Card>
+        <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-destructive/10 rounded-lg flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-destructive" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Sentimento Negativo</p>
-                <p className="text-2xl font-bold">{reportData.sentiment.negative}%</p>
-              </div>
+              <div className="w-12 h-12 bg-destructive/10 rounded-lg flex items-center justify-center"> <BarChart3 className="w-6 h-6 text-destructive" /> </div>
+              <div> <p className="text-sm text-muted-foreground">Sentimento Negativo</p> <p className="text-2xl font-bold">{reportData.sentiment.negative}%</p> </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Gráficos e Análises */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader><CardTitle>Evolução dos Feedbacks</CardTitle></CardHeader>
@@ -211,58 +167,40 @@ const ReportsContent = () => {
                         <div className="text-xs text-muted-foreground">feedbacks</div>
                       </div>
                       <div className="w-full bg-muted rounded-full h-2 mt-1">
-                        <div 
-                          className="bg-primary h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${(data.feedbacks / Math.max(1, ...monthlyData.map(d => d.feedbacks))) * 100}%` }}
-                        />
+                        <div className="bg-primary h-2 rounded-full transition-all duration-300"
+                             style={{ width: `${(data.feedbacks / Math.max(1, ...monthlyData.map(d => d.feedbacks))) * 100}%` }}/>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 ml-4">
                     <Star className="w-4 h-4 text-warning fill-current" />
-                    <span className="text-sm font-medium">{data.feedbacks}</span>
+                    {/* CORREÇÃO DE UI: Exibir a nota (rating) e não o número de feedbacks */}
+                    <span className="text-sm font-medium">{data.rating}</span>
                   </div>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader><CardTitle>Análise de Sentimento</CardTitle></CardHeader>
           <CardContent className="space-y-4 pt-6">
             <div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Positivo</span>
-                <span className="text-sm font-medium">{reportData.sentiment.positive}%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-3 mt-1">
-                <div className="bg-success h-3 rounded-full" style={{ width: `${reportData.sentiment.positive}%` }}/>
-              </div>
+              <div className="flex items-center justify-between"> <span className="text-sm">Positivo</span> <span className="text-sm font-medium">{reportData.sentiment.positive}%</span> </div>
+              <div className="w-full bg-muted rounded-full h-3 mt-1"> <div className="bg-success h-3 rounded-full" style={{ width: `${reportData.sentiment.positive}%` }}/> </div>
             </div>
             <div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Neutro</span>
-                <span className="text-sm font-medium">{reportData.sentiment.neutral}%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-3 mt-1">
-                <div className="bg-warning h-3 rounded-full" style={{ width: `${reportData.sentiment.neutral}%` }}/>
-              </div>
+              <div className="flex items-center justify-between"> <span className="text-sm">Neutro</span> <span className="text-sm font-medium">{reportData.sentiment.neutral}%</span> </div>
+              <div className="w-full bg-muted rounded-full h-3 mt-1"> <div className="bg-warning h-3 rounded-full" style={{ width: `${reportData.sentiment.neutral}%` }}/> </div>
             </div>
             <div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Negativo</span>
-                <span className="text-sm font-medium">{reportData.sentiment.negative}%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-3 mt-1">
-                <div className="bg-destructive h-3 rounded-full" style={{ width: `${reportData.sentiment.negative}%` }}/>
-              </div>
+              <div className="flex items-center justify-between"> <span className="text-sm">Negativo</span> <span className="text-sm font-medium">{reportData.sentiment.negative}%</span> </div>
+              <div className="w-full bg-muted rounded-full h-3 mt-1"> <div className="bg-destructive h-3 rounded-full" style={{ width: `${reportData.sentiment.negative}%` }}/> </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Top Produtos */}
       <Card>
         <CardHeader><CardTitle>Produtos Mais Avaliados</CardTitle></CardHeader>
         <CardContent>
@@ -280,7 +218,8 @@ const ReportsContent = () => {
                 </div>
                 <div className="flex items-center gap-1">
                   <Star className="w-4 h-4 text-warning fill-current" />
-                  <span className="font-medium">{product.feedbacks}</span>
+                  {/* CORREÇÃO DE UI: Exibir a nota (rating) e não o número de feedbacks */}
+                  <span className="font-medium">{product.rating}</span>
                 </div>
               </div>
             ))}
@@ -300,32 +239,47 @@ export const ReportsPage = () => {
   const [allFeedbacks, setAllFeedbacks] = useState<Feedback[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+useEffect(() => {
+  // tenta pegar do contexto primeiro
+  let empresaId = user?.empresaId;
 
-
-    const fetchFeedbacks = async () => {
+  // fallback para localStorage (ex: quando recarrega a página e o useAuth ainda está inicializando)
+  if (!empresaId) {
+    const stored = localStorage.getItem("user");
+    if (stored) {
       try {
-        setIsLoading(true);
-        const response = await api.get('/feedbacks');
-        setAllFeedbacks(response.data);
-      } catch (error) {
-        console.error("Erro ao buscar feedbacks:", error);
-        toast({
-          title: "Erro ao carregar dados",
-          description: "Não foi possível buscar os feedbacks. Tente novamente mais tarde.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+        empresaId = JSON.parse(stored).empresaId;
+      } catch {
+        empresaId = null;
       }
-    };
+    }
+  }
 
-    fetchFeedbacks();
+  if (!empresaId) return; // sem empresaId, não busca
 
-  }, [ user, navigate, toast]);
+  const fetchFeedbacks = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get(`/feedbacks/empresa/${empresaId}`);
+      console.log("Feedbacks:", response.data, empresaId);
+      setAllFeedbacks(response.data);
+    } catch (error) {
+      console.error("Erro ao buscar feedbacks:", error);
+      toast({
+        title: "Erro ao carregar dados",
+        description: "Não foi possível buscar os feedbacks. Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchFeedbacks();
+}, [user?.empresaId]);
 
 
-  if (isLoading) {
+  if (isLoading || !user?.empresaId) { // Mostra o loading enquanto carrega ou se não houver user
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />

@@ -1,25 +1,69 @@
+import { useState, useEffect } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Star } from "lucide-react";
+import api from "../lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
-// Definindo a interface para os dados de distribuição de feedback
+interface Feedback {
+  _id: string;
+  _respostas: { tipo: "nota" | "texto"; nota?: number; resposta_texto?: string }[];
+  _dataCriacao: string;
+}
+
 interface FeedbackData {
   name: string;
   value: number;
 }
 
-// Dados de exemplo tipados
-const data: FeedbackData[] = [
-  { name: "5 Estrelas", value: 300 },
-  { name: "4 Estrelas", value: 200 },
-  { name: "3 Estrelas", value: 150 },
-  { name: "2 Estrelas", value: 50 },
-  { name: "1 Estrela", value: 30 },
-];
-
-const COLORS: string[] = ["#00C49F", "#FFBB28", "#FF8042", "#FF4500", "#FF0000"]; // Cores para cada fatia
+const COLORS: string[] = ["#AD343E", "#FF8552", "#FFBF69", "#9EE493", "#2081C3"];
 
 export const FeedbackDistributionChart = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [data, setData] = useState<FeedbackData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.empresaId) return;
+
+    const fetchFeedbacks = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get<Feedback[]>(`/feedbacks/empresa/${user.empresaId}`);
+        const feedbacks = res.data;
+
+        // Contar quantidade de cada nota
+        const counts = [0, 0, 0, 0, 0]; // índices 0=>1 estrela, 4=>5 estrelas
+        feedbacks.forEach(fb => {
+          const rating = fb._respostas.find(r => r.tipo === "nota")?.nota;
+          if (rating) counts[rating - 1] += 1;
+        });
+
+        const chartData: FeedbackData[] = counts.map((value, i) => ({
+          name: `${i + 1} Estrela${i === 0 ? "" : "s"}`,
+          value,
+        }));
+
+        setData(chartData);
+      } catch (err) {
+        console.error(err);
+        toast({
+          title: "Erro ao carregar dados",
+          description: "Não foi possível buscar a distribuição de feedbacks.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeedbacks();
+  }, [user?.empresaId, toast]);
+
+  if (loading) return <div className="text-center p-4">Carregando distribuição de avaliações...</div>;
+
   return (
     <Card>
       <CardHeader>
@@ -38,9 +82,7 @@ export const FeedbackDistributionChart = () => {
               outerRadius={80}
               fill="#8884d8"
               dataKey="value"
-              label={({ name, percent }: { name: string; percent: number }) =>
-                `${name} (${(percent * 100).toFixed(0)}%)`
-              }
+              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
             >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

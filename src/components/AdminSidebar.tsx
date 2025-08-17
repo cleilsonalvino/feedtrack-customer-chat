@@ -1,50 +1,22 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
-  Users,
-  MessageSquare,
-  Settings,
-  FileBarChart,
+  Building,
   LogOut,
-  Star,
-  FolderKanban,
-  DollarSign,
-  Cylinder
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
 
-const getNavigation = (isAdmin: boolean) => {
-  const baseNavigation = [
-    { name: "Clientes", href: "/customers", icon: Users },
-    { name: "Campanhas", href: "/campaigns", icon: MessageSquare },
-    { name: "Feedbacks", href: "/feedbacks", icon: Star },
-    { name: "Produtos", href: "/products", icon: Cylinder },
-    { name: "Vendas", href: "/sales", icon: DollarSign },
-  ];
+const navigation = [
+  { name: "Empresas", href: "/admin", icon: Building },
+  { name: "Configurações", href: "/admin/settings", icon: Settings },
+];
 
-  const adminNavigation = [
-    { name: "Dashboard", href: "/home", icon: BarChart3 },
-    ...baseNavigation,
-    { name: "Editor de Formulário", href: "/form-builder", icon: FolderKanban },
-    { name: "Relatórios", href: "/reports", icon: FileBarChart },
-    { name: "Configurações", href: "/settings", icon: Settings },
-  ];
-
-  return isAdmin ? adminNavigation : baseNavigation;
-};
-
-export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
+export const AdminSidebar = ({ onClose }: { onClose?: () => void }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, userEmpresa, logout } = useAuth();
-
-  const [nomeEmpresa, setNomeEmpresa] = useState<string>("");
-  const [tipoUsuario, setTipoUsuario] = useState<string>("");
-
-  const isAdmin = user?.tipo === "ADMIN" || user?.tipo === "SUPER_ADMIN";
-  const navigation = getNavigation(isAdmin);
+  const { logout } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -52,33 +24,20 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
     navigate("/login");
   };
 
-  useEffect(() => {
-    setNomeEmpresa(userEmpresa?.props.nome || user?.nomeUsuario || "");
-    setTipoUsuario(user?.tipo || "");
-  }, [user, userEmpresa]);
-
   return (
     <div className="w-64 bg-card border-r h-screen sticky top-0 flex flex-col">
-      {/* Header */}
       <div className="p-6 border-b">
         <div className="flex justify-start gap-2">
           <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
             <BarChart3 className="w-5 h-5 text-primary-foreground" />
           </div>
           <h1 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            {nomeEmpresa}
+            Admin
           </h1>
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 p-4">
-        <div className="mb-4 px-3 py-2 bg-muted/50 rounded-lg">
-          <p className="text-xs text-muted-foreground">
-            Logado como: {tipoUsuario}
-          </p>
-        </div>
-
         <ul className="space-y-2">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
@@ -113,11 +72,10 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
         </ul>
       </nav>
 
-      {/* Footer */}
       <div className="p-4 border-t">
         <div className="text-xs text-muted-foreground">
           <p>FeedTrack v1.0</p>
-          <p>Sistema de Gestão Pós-Venda</p>
+          <p>Painel Administrativo</p>
         </div>
       </div>
     </div>

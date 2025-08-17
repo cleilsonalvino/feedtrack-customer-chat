@@ -1,10 +1,18 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 import api from "@/lib/api";
 
 type UserEmpresa = {
   id: string;
-  nome: string;
-  cnpj?: string;
+  props: {
+    nome: string;
+    cnpj?: string;
+  };
 };
 
 type User = {
@@ -25,8 +33,13 @@ type AuthContextType = {
   userEmpresa: UserEmpresa | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (nomeUsuario: string, senha: string) => Promise<void>;
-  register: (data: { nome: string; cnpj?: string; email: string; plano: string }) => Promise<void>;
+  login: (nomeUsuario: string, senha: string) => Promise<User>;
+  register: (data: {
+    nome: string;
+    cnpj?: string;
+    email: string;
+    plano: string;
+  }) => Promise<void>;
   logout: () => void;
 };
 
@@ -53,31 +66,38 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setLoading(false);
   }, []);
 
-const login = async (nomeUsuario: string, senha: string) => {
-  try {
-    const response = await api.post("/login", { nomeUsuario, senha });
-    const usuario: User = response.data;
+  const login = async (nomeUsuario: string, senha: string) => {
+    try {
+      const response = await api.post("/login", { nomeUsuario, senha });
+      const usuario: User = response.data;
 
-    // SALVA O USER
-    setUser(usuario);
-    localStorage.setItem("user", JSON.stringify(usuario));
+      // SALVA O USER
+      setUser(usuario);
+      localStorage.setItem("user", JSON.stringify(usuario));
 
-    if (usuario.empresaId) {
-      const empresaRes = await api.get(`/empresa/${usuario.empresaId}`);
-      const empresa: UserEmpresa = empresaRes.data;
-      setUserEmpresa(empresa);
-      localStorage.setItem("userEmpresa", JSON.stringify(empresa));
-    } else {
-      setUserEmpresa(null);
-      localStorage.removeItem("userEmpresa");
+      if (usuario.empresaId) {
+        const empresaRes = await api.get(`/empresa/${usuario.empresaId}`);
+        const empresa: UserEmpresa = empresaRes.data;
+        setUserEmpresa(empresa);
+        localStorage.setItem("userEmpresa", JSON.stringify(empresa));
+      } else {
+        setUserEmpresa(null);
+        localStorage.removeItem("userEmpresa");
+      }
+      return usuario;
+    } catch (error: any) {
+      throw new Error(
+        "Falha no login: " + (error.response?.data?.message || error.message)
+      );
     }
-  } catch (error: any) {
-    throw new Error("Falha no login: " + (error.response?.data?.message || error.message));
-  }
-};
+  };
 
-
-  const register = async (data: { nome: string; cnpj?: string; email: string; plano: string }) => {
+  const register = async (data: {
+    nome: string;
+    cnpj?: string;
+    email: string;
+    plano: string;
+  }) => {
     try {
       const payload = {
         nome: data.nome,
@@ -102,7 +122,9 @@ const login = async (nomeUsuario: string, senha: string) => {
       localStorage.setItem("user", JSON.stringify(usuario));
       setUser(usuario);
     } catch (error: any) {
-      throw new Error("Falha no cadastro: " + (error.response?.data?.message || error.message));
+      throw new Error(
+        "Falha no cadastro: " + (error.response?.data?.message || error.message)
+      );
     }
   };
 

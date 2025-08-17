@@ -10,17 +10,13 @@ export interface Campanha {
   id: string;
   titulo: string;
   descricao: string;
-  tipoCampanha: string;
-  segmentoAlvo: string;
   canalEnvio: string;
-  dataFim: string;
   templateMensagem: string;
   formularioId: string;
-  ativo: boolean;
   empresaId: string; // agora obrigatório
 }
 
-export type NewCampaignData = Omit<Campanha, 'id' | 'ativo' | 'dataInicio'>;
+export type NewCampaignData = Omit<Campanha, 'id'>;
 
 interface CampaignContextType {
   campaigns: Campanha[];
@@ -75,19 +71,6 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
   const addCampaign = async (campaignData: NewCampaignData) => {
     if (!user?.empresaId) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to start of day
-    const dataFim = new Date(campaignData.dataFim);
-
-    if (dataFim < today) {
-      toast({
-        title: "Erro",
-        description: "A Data Fim da campanha não pode ser anterior à data atual.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       const empresaId = user?.empresaId || localStorage.getItem("user");
       console.log("EmpresaId", empresaId)
@@ -122,18 +105,6 @@ const payload = { ...campaignData, empresaId };
       return;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to start of day
-    const dataFim = new Date(campaignData.dataFim || campaignToUpdate.dataFim);
-
-    if (dataFim < today) {
-      toast({
-        title: "Erro",
-        description: "A Data Fim da campanha não pode ser anterior à data atual.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     const updatedLocalCampaign = { ...campaignToUpdate, ...campaignData, empresaId: user.empresaId };
 
@@ -150,8 +121,9 @@ const payload = { ...campaignData, empresaId };
   const deleteCampaign = async (campaignId: string) => {
     try {
       await api.delete(`/deletar-campanha/${campaignId}`);
-      setCampaigns(current => current.map(c => c.id === campaignId ? { ...c, ativo: false } : c));
-      toast({ title: "Sucesso", description: "Campanha desativada." });
+      setCampaigns(current => current.filter(c => c.id !== campaignId));
+
+      toast({ title: "Sucesso", description: "Campanha Deletada." });
     } catch (error) {
       console.error("Erro ao desativar campanha:", error);
       toast({ title: "Erro", description: "Não foi possível desativar a campanha.", variant: "destructive" });

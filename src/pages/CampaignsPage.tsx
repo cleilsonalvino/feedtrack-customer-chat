@@ -24,7 +24,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription,
   DialogFooter,
 } from "../components/ui/dialog";
@@ -37,19 +36,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { Calendar } from "../components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../components/ui/popover";
 import {
   Plus,
   Edit,
   Trash2,
-  Play,
-  Pause,
-  Calendar as CalendarIcon,
   Search,
   Loader2,
   Send,
@@ -202,6 +192,9 @@ const ManualSendModal = ({
         campanhaId: campaign.id,
       };
 
+      console.log("[PAYLOAD]", payload);
+
+
       return api.post("/envio/individual", payload); // API espera o JSON, não URL
     });
 
@@ -330,9 +323,6 @@ export const CampaignsPage = () => {
     titulo: "",
     descricao: "",
     canalEnvio: "EMAIL",
-    tipoCampanha: "POS_COMPRA",
-    segmentoAlvo: "TODOS_CLIENTES",
-    dataFim: new Date().toISOString(),
     templateMensagem:
       "Olá [Nome do Cliente],\n\nEsperamos que você esteja aproveitando o [Nome do Produto].\nGostaríamos de saber: o produto atendeu às suas expectativas?\nSua avaliação nos ajuda a melhorar e oferecer sempre o melhor para você.\nPor favor, deixe seu feedback no link abaixo:\n\nAgradecemos pela sua confiança!\n\nAtenciosamente, \n[Nome da Empresa]",
   });
@@ -392,10 +382,7 @@ export const CampaignsPage = () => {
       setNewCampaign({
         titulo: "",
         descricao: "",
-        tipoCampanha: "POS_COMPRA",
         canalEnvio: "EMAIL",
-        segmentoAlvo: "TODOS_CLIENTES",
-        dataFim: new Date().toISOString(),
         templateMensagem: "",
       });
       setSelectedFormId(null);
@@ -410,11 +397,6 @@ export const CampaignsPage = () => {
     setEditingCampaign(null);
   };
 
-  // Toggles the active status of a campaign
-  const handleToggleCampaignStatus = async (campaign: Campanha) => {
-    await updateCampaign(campaign.id, { ativo: !campaign.ativo });
-  };
-
   // Deletes a campaign (soft delete as handled by the context)
   const handleDeleteCampaign = async (id: string) => {
     if (window.confirm("Tem certeza que deseja desativar esta campanha?")) {
@@ -422,27 +404,7 @@ export const CampaignsPage = () => {
     }
   };
 
-  // Helper to render the status badge
-  const getStatusBadge = (ativo: boolean) => {
-    return ativo ? (
-      <Badge className="bg-green-500 text-white hover:bg-green-600">
-        Ativa
-      </Badge>
-    ) : (
-      <Badge variant="secondary">Inativa</Badge>
-    );
-  };
 
-  // Helper to safely format dates
-  const formatDateSafe = (
-    date: string | Date | null | undefined,
-    formatString: string
-  ) => {
-    if (!date) return "N/A";
-    const dateObj = new Date(date);
-    if (!isValid(dateObj)) return "Data Inválida";
-    return format(dateObj, formatString);
-  };
 
   return (
     <div className="space-y-6 p-4 md:p-8 mt-8">
@@ -481,81 +443,73 @@ export const CampaignsPage = () => {
           ) : (
             <div className="space-y-4">
               {filteredCampaigns.map((campaign) => (
-                <div
-                  key={campaign.id}
-                  className="border rounded-lg p-4 hover:bg-muted/50"
-                >
-                  <div className="flex items-start justify-between flex-wrap">
-                    <div className="flex-grow">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-lg">
-                          {campaign.titulo}
-                        </h3>
-                        {getStatusBadge(campaign.ativo)}
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {campaign.descricao}
-                      </p>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap mb-2">
-                        <span>Tipo: {campaign.tipoCampanha}</span>
-                        <span>Segmento: {campaign.segmentoAlvo}</span>
-                        <span>
-                          Período:{" "}
-                          {formatDateSafe(campaign.dataFim, "dd/MM/yy")}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        title="Envio Manual"
-                        onClick={() =>
-                          setManualSendState({
-                            isOpen: true,
-                            campaign: campaign,
-                          })
-                        }
-                      >
-                        <Send className="w-3 h-3" />
-                      </Button>
-                      {campaign.ativo ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          title="Pausar Campanha"
-                          onClick={() => handleToggleCampaignStatus(campaign)}
-                        >
-                          <Pause className="w-3 h-3" />
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          title="Iniciar Campanha"
-                          onClick={() => handleToggleCampaignStatus(campaign)}
-                        >
-                          <Play className="w-3 h-3" />
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        title="Editar Campanha"
-                        onClick={() => setEditingCampaign(campaign)}
-                      >
-                        <Edit className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        title="Desativar Campanha"
-                        onClick={() => handleDeleteCampaign(campaign.id)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+<div
+  key={campaign.id}
+  className="border rounded-xl p-4 hover:shadow-lg transition-shadow duration-200 bg-white"
+>
+  <div className="flex justify-between items-start flex-wrap gap-2">
+    <div className="flex flex-col gap-2">
+      {/* Título da campanha */}
+      <h3 className="text-lg font-semibold text-gray-900">{campaign.titulo}</h3>
+      
+      {/* Descrição */}
+      <p className="text-sm text-gray-600">{campaign.descricao}</p>
+      
+      {/* Formulário associado */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-gray-500">Formulário:</span>
+        <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-800 text-xs font-medium">
+          {campaign.formularioId || "Não definido"}
+        </span>
+      </div>
+      
+      {/* Canal de envio */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-gray-500">Canal de Envio:</span>
+        {campaign.canalEnvio === "EMAIL" ? (
+          <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+            Email
+          </span>
+        ) : (
+          <span className="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
+            WhatsApp
+          </span>
+        )}
+      </div>
+    </div>
+
+    {/* Ações */}
+    <div className="flex gap-2 flex-wrap">
+      <Button
+        size="sm"
+        variant="outline"
+        title="Envio Manual"
+        onClick={() =>
+          setManualSendState({ isOpen: true, campaign: campaign })
+        }
+      >
+        <Send className="w-3 h-3" />
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        title="Editar Campanha"
+        onClick={() => setEditingCampaign(campaign)}
+      >
+        <Edit className="w-3 h-3" />
+      </Button>
+      <Button
+        size="sm"
+        variant="destructive"
+        title="Desativar Campanha"
+        onClick={() => handleDeleteCampaign(campaign.id)}
+      >
+        <Trash2 className="w-3 h-3" />
+      </Button>
+    </div>
+  </div>
+</div>
+
               ))}
             </div>
           )}
@@ -613,85 +567,6 @@ export const CampaignsPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="type">Tipo</Label>
-                <Select
-                  value={newCampaign.tipoCampanha}
-                  onValueChange={(v) =>
-                    setNewCampaign({ ...newCampaign, tipoCampanha: v })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="POS_COMPRA">Pós-Compra</SelectItem>
-                    <SelectItem value="AUTOMATICO">Automático</SelectItem>
-                    <SelectItem value="PROMOCIONAL">Promocional</SelectItem>
-                    <SelectItem value="SATISFACAO">Satisfação</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="segment">Segmento</Label>
-                <Select
-                  value={newCampaign.segmentoAlvo}
-                  onValueChange={(v) =>
-                    setNewCampaign({ ...newCampaign, segmentoAlvo: v })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TODOS_CLIENTES">Todos</SelectItem>
-                    <SelectItem value="CLIENTES_REGULARES">
-                      Clientes Regulares
-                    </SelectItem>
-                    <SelectItem value="NOVOS_CLIENTES">
-                      Novos Clientes
-                    </SelectItem>
-                    <SelectItem value="CLIENTES_PREMIUM">
-                      Clientes Premium
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Data de Fim</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formatDateSafe(newCampaign.dataFim, "dd/MM/yyyy")}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={new Date(newCampaign.dataFim)}
-                      onSelect={(date) =>
-                        date &&
-                        setNewCampaign({
-                          ...newCampaign,
-                          dataFim: date.toISOString(),
-                        })
-                      }
-                      initialFocus
-                      locale={ptBR}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
             <div className="col-span-2">
               <Label htmlFor="channel">Canal de Envio</Label>
               <Select
@@ -726,11 +601,11 @@ export const CampaignsPage = () => {
               />
             </div>
             <p className="text-600 text-sm bg-slate-100">
-              Crie sua mensagem usando os placeholders <span className="text-orange-600">[Nome do Cliente]</span>, <span className="text-orange-600">
-                [Nome
-                do Produto]
-              </span> e <span className="text-orange-600">[Nome da Empresa]</span>; eles serão substituídos
-              automaticamente pelos dados reais.
+              Crie sua mensagem usando os placeholders{" "}
+              <span className="text-orange-600">[Nome do Cliente]</span>,{" "}
+              <span className="text-orange-600">[Nome do Produto]</span> e{" "}
+              <span className="text-orange-600">[Nome da Empresa]</span>; eles
+              serão substituídos automaticamente pelos dados reais.
             </p>
 
             <div className="flex justify-end gap-2 pt-4">
@@ -760,8 +635,88 @@ export const CampaignsPage = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
-              {/* Form fields are identical to create, but pre-filled with editingCampaign data */}
-              {/* ... (rest of the edit form fields) ... */}
+              <div>
+                <Label htmlFor="name">Nome da Campanha *</Label>
+                <Input
+                  id="name"
+                  value={editingCampaign.titulo}
+                  onChange={(e) =>
+                    setEditingCampaign({
+                      ...editingCampaign,
+                      titulo: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="description">Descrição</Label>
+                <Textarea
+                  id="description"
+                  value={editingCampaign.descricao}
+                  onChange={(e) =>
+                    setEditingCampaign({
+                      ...editingCampaign,
+                      descricao: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="form">Formulário *</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setEditingCampaign({
+                      ...editingCampaign,
+                      formularioId: value,
+                    })
+                  }
+                  value={editingCampaign.formularioId || ""}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um formulário..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formularios.map((form) => (
+                      <SelectItem key={form.id} value={form.id}>
+                        {form.titulo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="channel">Canal de Envio</Label>
+                <Select
+                  value={editingCampaign.canalEnvio}
+                  onValueChange={(v) =>
+                    setEditingCampaign({
+                      ...editingCampaign,
+                      canalEnvio: v as "EMAIL" | "WHATSAPP",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um canal..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
+                    <SelectItem value="EMAIL">Email</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="template">Template da Mensagem *</Label>
+                <Textarea
+                  id="template"
+                  value={editingCampaign.templateMensagem}
+                  onChange={(e) =>
+                    setEditingCampaign({
+                      ...editingCampaign,
+                      templateMensagem: e.target.value,
+                    })
+                  }
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button

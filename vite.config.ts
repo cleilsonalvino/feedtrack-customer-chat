@@ -6,8 +6,9 @@ import path from "path";
 export default defineConfig(({ mode }) => ({
   server: {
     // Permite acesso de qualquer host no dev server
-    host: true,
-    port: 5173, // ou outra porta que você queira
+    host: true, // permite acesso externo
+    allowedHosts: ['feedtrack.site', 'localhost', '127.0.0.1'], 
+    port: 5176,
   },
   plugins: [
     react(), // Plugin oficial do React com SWC

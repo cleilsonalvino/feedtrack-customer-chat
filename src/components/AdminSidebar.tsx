@@ -10,7 +10,6 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const navigation = [
   { name: "Empresas", href: "/admin", icon: Building },
-  { name: "Configurações", href: "/admin/settings", icon: Settings },
 ];
 
 export const AdminSidebar = ({ onClose }: { onClose?: () => void }) => {

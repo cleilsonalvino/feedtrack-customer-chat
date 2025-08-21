@@ -43,6 +43,7 @@ import {
   Search,
   Loader2,
   Send,
+  Mail,
 } from "lucide-react";
 import { Checkbox } from "../components/ui/checkbox";
 import { useToast } from "../hooks/use-toast";
@@ -299,6 +300,140 @@ const ManualSendModal = ({
   );
 };
 
+// --- BULK SEND MODAL COMPONENT ---
+const BulkSendModal = ({
+  isOpen,
+  onOpenChange,
+  campaign,
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  campaign: Campanha | null;
+}) => {
+  const [produtos, setProdutos] = useState<{ id: string; nome: string }[]>([]);
+  const [selectedProdutoId, setSelectedProdutoId] = useState<string | null>(null);
+  const [loadingProdutos, setLoadingProdutos] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (isOpen && user?.empresaId) {
+      const fetchProdutos = async () => {
+        setLoadingProdutos(true);
+        try {
+          const response = await api.get(`/produtos?empresaId=${user.empresaId}`);
+          setProdutos(response.data);
+        } catch (error) {
+          console.error("Erro ao buscar produtos:", error);
+          toast({
+            title: "Erro",
+            description: "Não foi possível carregar a lista de produtos.",
+            variant: "destructive",
+          });
+        } finally {
+          setLoadingProdutos(false);
+        }
+      };
+      fetchProdutos();
+    } else {
+      setSelectedProdutoId(null);
+    }
+  }, [isOpen, user?.empresaId, toast]);
+
+  const handleBulkSend = async () => {
+    if (!selectedProdutoId) {
+      toast({
+        title: "Nenhum produto selecionado",
+        description: "Por favor, selecione um produto para o envio em massa.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!campaign || !user?.id || !user.empresaId) {
+      toast({
+        title: "Erro de Autenticação",
+        description: "Dados da campanha ou do usuário não encontrados. Faça login novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
+      const payload = {
+        produtoId: selectedProdutoId,
+        empresaId: user.empresaId,
+        campanhaId: campaign.id,
+      };
+      await api.post("/envio/massa", payload);
+      toast({
+        title: "Envio em Massa Iniciado!",
+        description: `A campanha "${campaign.titulo}" está sendo enviada para todos os clientes do produto selecionado.`,
+      });
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Erro no envio em massa:", error);
+      toast({
+        title: "Erro no Envio",
+        description: "Ocorreu um erro ao iniciar o envio em massa.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Envio em Massa por Produto</DialogTitle>
+          <DialogDescription>
+            Selecione um produto para enviar a campanha{" "}
+            <span className="font-semibold text-primary">
+              "{campaign?.titulo}"
+            </span>
+            {" "}para todos os clientes que o compraram.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4 space-y-4">
+          {loadingProdutos ? (
+            <div className="flex justify-center items-center h-24">
+              <Loader2 className="animate-spin" />
+            </div>
+          ) : (
+            <Select onValueChange={setSelectedProdutoId} value={selectedProdutoId || ""}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um produto..." />
+              </SelectTrigger>
+              <SelectContent>
+                {produtos.map((produto) => (
+                  <SelectItem key={produto.id} value={produto.id}>
+                    {produto.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={handleBulkSend} disabled={isSending || loadingProdutos}>
+            {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Enviar em Massa
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+
 // --- MAIN CAMPAIGNS PAGE COMPONENT ---
 export const CampaignsPage = () => {
   const { campaigns, addCampaign, updateCampaign, deleteCampaign, loading } =
@@ -311,10 +446,14 @@ export const CampaignsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campanha | null>(null);
-  const [manualSendState, setManualSendState] = useState<{
-    isOpen: boolean;
-    campaign: Campanha | null;
-  }>({ isOpen: false, campaign: null });
+  const [manualSendState, setManualSendState] = useState({
+    isOpen: false,
+    campaign: null,
+  });
+  const [bulkSendState, setBulkSendState] = useState({
+    isOpen: false,
+    campaign: null,
+  });
 
   // State for the new campaign creation form
   const [newCampaign, setNewCampaign] = useState<
@@ -489,6 +628,16 @@ export const CampaignsPage = () => {
         }
       >
         <Send className="w-3 h-3" />
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        title="Envio em Massa"
+        onClick={() =>
+          setBulkSendState({ isOpen: true, campaign: campaign })
+        }
+      >
+        <Mail className="w-3 h-3" />
       </Button>
       <Button
         size="sm"
@@ -738,6 +887,15 @@ export const CampaignsPage = () => {
           setManualSendState({ isOpen: open, campaign: null })
         }
         campaign={manualSendState.campaign}
+      />
+
+      {/* Bulk Send Modal */}
+      <BulkSendModal
+        isOpen={bulkSendState.isOpen}
+        onOpenChange={(open) =>
+          setBulkSendState({ isOpen: open, campaign: null })
+        }
+        campaign={bulkSendState.campaign}
       />
     </div>
   );

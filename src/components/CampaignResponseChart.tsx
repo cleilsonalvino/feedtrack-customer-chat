@@ -26,7 +26,7 @@ export const CampaignResponseChart = () => {
           <BarChart3 className="w-5 h-5" /> Taxa de Resposta por Campanha
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="blur">
         <ResponsiveContainer width="100%" height={300}>
           <BarChart
             data={campaigns}

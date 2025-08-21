@@ -35,7 +35,7 @@ export const FeedbackByCategoryChart = () => {
           <FolderKanban className="w-5 h-5" /> Feedback por Categoria
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="blur">
         <ResponsiveContainer width="100%" height={300}>
           <BarChart
             data={data}

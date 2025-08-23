@@ -13,7 +13,6 @@ import { CustomersPage } from "./pages/CustomersPage";
 import { CampaignsPage } from "./pages/CampaignsPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
-import { FeedbacksPage } from "./pages/FeedbacksPage";
 import SalesPage from "./pages/SalesPage"; // Import the new SalesPage
 import NotFound from "./pages/NotFound";
 import { Login } from "./pages/Login";
@@ -71,10 +70,6 @@ const App = () => (
                           <Route
                             path="/campaigns"
                             element={<CampaignsPage />}
-                          />
-                          <Route
-                            path="/feedbacks"
-                            element={<FeedbacksPage />}
                           />
                           <Route path="/form-builder" element={<FormsPage />} />
                           <Route path="/products" element={<ProductsPage />} />

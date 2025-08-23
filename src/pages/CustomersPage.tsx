@@ -30,6 +30,7 @@ import {
   Loader2,
   Eye,
   RotateCcw,
+  Trash,
 } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 
@@ -457,6 +458,10 @@ export const CustomersPage = () => {
                   <Button onClick={() => handleReactivateCustomer(customer)}>
                     <RotateCcw className="w-4 h-4 mr-2" />
                     Reativar
+                  </Button>
+                  <Button onClick={() => handleReactivateCustomer(customer)} className="bg-red-500 text-white">
+                    <Trash className="w-4 h-4 mr-2 " />
+                    Excluir Permanentemente
                   </Button>
                 </div>
               ))

@@ -19,15 +19,14 @@ const getNavigation = (isAdmin: boolean) => {
   const baseNavigation = [
     { name: "Clientes", href: "/customers", icon: Users },
     { name: "Campanhas", href: "/campaigns", icon: MessageSquare },
-    { name: "Feedbacks", href: "/feedbacks", icon: Star },
     { name: "Produtos", href: "/products", icon: Cylinder },
     { name: "Vendas", href: "/sales", icon: DollarSign },
+    { name: "Editor de Formulário", href: "/form-builder", icon: FolderKanban },
   ];
 
   const adminNavigation = [
     { name: "Dashboard", href: "/home", icon: BarChart3 },
     ...baseNavigation,
-    { name: "Editor de Formulário", href: "/form-builder", icon: FolderKanban },
     { name: "Relatórios", href: "/reports", icon: FileBarChart },
     { name: "Configurações", href: "/settings", icon: Settings },
   ];

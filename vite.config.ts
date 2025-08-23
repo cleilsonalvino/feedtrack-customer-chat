@@ -2,24 +2,27 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
-// Configuração do Vite
 export default defineConfig(({ mode }) => ({
   server: {
-    // Permite acesso de qualquer host no dev server
     host: true, // permite acesso externo
-    allowedHosts: ['feedtrack.site', 'localhost', '127.0.0.1'], 
     port: 5176,
+    allowedHosts: [
+      "all", // libera tudo
+      // ou então lista só os hosts que você quer:
+      "feedtrack.site",
+      "localhost",
+      "127.0.0.1",
+      "0ad114b79e6c.ngrok-free.app",
+    ],
   },
-  plugins: [
-    react(), // Plugin oficial do React com SWC
-  ],
+  plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"), // Facilita imports usando @
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   build: {
-    target: "esnext", // Compatível com navegadores modernos
-    sourcemap: mode === "development", // Sourcemaps só no dev
+    target: "esnext",
+    sourcemap: mode === "development",
   },
 }));

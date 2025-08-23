@@ -12,6 +12,7 @@ type UserEmpresa = {
   props: {
     nome: string;
     cnpj?: string;
+    email?: string;
   };
 };
 

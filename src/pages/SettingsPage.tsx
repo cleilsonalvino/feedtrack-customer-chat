@@ -125,7 +125,7 @@ export const SettingsPage = () => {
       return;
     }
     try {
-      await api.put(`/empresa/${user.empresaId}`, {
+      await api.patch(`/empresa/${user.empresaId}`, {
         nome: companyName,
         email: companyEmail,
       });

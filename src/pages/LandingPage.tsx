@@ -84,7 +84,6 @@ export const LandingPage = () => {
         "Relatórios avançados",
         "Suporte prioritário",
         "5 usuários",
-        "Integrações API"
       ],
       popular: true,
       buttonText: "Assinar Agora"
@@ -97,11 +96,9 @@ export const LandingPage = () => {
       features: [
         "Clientes ilimitados",
         "Campanhas ilimitadas",
-        "Analytics avançados",
+        "Relatórios avançados",
         "Suporte 24/7",
         "Usuários ilimitados",
-        "Integrações personalizadas",
-        "Gerente de conta dedicado"
       ],
       popular: false,
       buttonText: "Falar com Vendas"

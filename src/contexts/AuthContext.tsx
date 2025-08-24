@@ -67,31 +67,37 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setLoading(false);
   }, []);
 
-  const login = async (nomeUsuario: string, senha: string) => {
-    try {
-      const response = await api.post("/login", { nomeUsuario, senha });
-      const usuario: User = response.data;
+const login = async (nomeUsuario: string, senha: string) => {
+  try {
+    const response = await api.post("/login", { nomeUsuario, senha });
 
-      // SALVA O USER
-      setUser(usuario);
-      localStorage.setItem("user", JSON.stringify(usuario));
+    const { token, usuario } = response.data; // token do backend
 
-      if (usuario.empresaId) {
-        const empresaRes = await api.get(`/empresa/${usuario.empresaId}`);
-        const empresa: UserEmpresa = empresaRes.data;
-        setUserEmpresa(empresa);
-        localStorage.setItem("userEmpresa", JSON.stringify(empresa));
-      } else {
-        setUserEmpresa(null);
-        localStorage.removeItem("userEmpresa");
-      }
-      return usuario;
-    } catch (error: any) {
-      throw new Error(
-        "Falha no login: " + (error.response?.data?.message || error.message)
-      );
+    // SALVA O USER
+    setUser(usuario);
+    localStorage.setItem("user", JSON.stringify(usuario));
+
+    // SALVA O TOKEN
+    localStorage.setItem("authToken", token);
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+    if (usuario.empresaId) {
+      const empresaRes = await api.get(`/empresa/${usuario.empresaId}`);
+      const empresa: UserEmpresa = empresaRes.data;
+      setUserEmpresa(empresa);
+      localStorage.setItem("userEmpresa", JSON.stringify(empresa));
+    } else {
+      setUserEmpresa(null);
+      localStorage.removeItem("userEmpresa");
     }
-  };
+
+    return usuario;
+  } catch (error: any) {
+    throw new Error(
+      "Falha no login: " + (error.response?.data?.message || error.message)
+    );
+  }
+};
 
   const register = async (data: {
     nome: string;
@@ -124,8 +130,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setUser(usuario);
     } catch (error: any) {
       throw new Error(
-        "Falha no cadastro: " + (error.response?.data?.message || error.message)
-      );
+        "Falha no cadastro: Nome ou Email já existem no sistema")
     }
   };
 

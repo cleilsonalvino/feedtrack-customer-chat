@@ -11,45 +11,51 @@ export const Register = () => {
     tipo: "success" | "danger";
     mensagem: string;
   } | null>(null);
+    const [loading, setLoading] = useState(false); // NOVO estado
 
   const navigate = useNavigate();
   const { register } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAlerta(null);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setAlerta(null);
+  setLoading(true); // ✅ ativa o loading
 
-    if (!nome.trim()) {
-      setAlerta({
-        tipo: "danger",
-        mensagem: "O campo Nome da Empresa é obrigatório.",
-      });
-      return;
-    }
+  if (!nome.trim()) {
+    setAlerta({
+      tipo: "danger",
+      mensagem: "O campo Nome da Empresa é obrigatório.",
+    });
+    setLoading(false); // ❌ desativa o loading se houver erro
+    return;
+  }
 
-    try {
-      await register({
-        nome,
-        cnpj: cnpj.trim() ? cnpj : undefined,
-        email,
-        plano,
-      });
+  try {
+    await register({
+      nome,
+      cnpj: cnpj.trim() ? cnpj : undefined,
+      email,
+      plano,
+    });
 
-      setAlerta({
-        tipo: "success",
-        mensagem: "Empresa cadastrada com sucesso! Redirecionando...",
-      });
+    setAlerta({
+      tipo: "success",
+      mensagem: "Empresa cadastrada com sucesso! Redirecionando...",
+    });
 
-      setTimeout(() => {
-        navigate("/login", { replace: true });
-      }, 2000);
-    } catch (error: any) {
-      setAlerta({
-        tipo: "danger",
-        mensagem: error.message || "Erro ao cadastrar. Tente novamente.",
-      });
-    }
-  };
+    setTimeout(() => {
+      navigate("/login", { replace: true });
+    }, 2000);
+  } catch (error: any) {
+    setAlerta({
+      tipo: "danger",
+      mensagem: error.message || "Erro ao cadastrar. Tente novamente.",
+    });
+  } finally {
+    setLoading(false); // ✅ garante que o loading seja desativado
+  }
+};
+
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
@@ -162,10 +168,37 @@ export const Register = () => {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white font-medium py-2 rounded-md hover:bg-blue-700 transition"
+            disabled={loading} // bloqueia clique enquanto carrega
+            className={`w-full bg-blue-600 text-white font-medium py-2 rounded-md hover:bg-blue-700 transition flex justify-center items-center ${
+              loading ? "cursor-not-allowed opacity-70" : ""
+            }`}
           >
-            Cadastrar Empresa
+            {loading ? (
+              <svg
+                className="animate-spin h-5 w-5 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8H4z"
+                ></path>
+              </svg>
+            ) : (
+              "Cadastrar Empresa"
+            )}
           </button>
+
 
           <div className="flex">
             <p>voltar para</p>

@@ -170,7 +170,7 @@ export const FormProvider = ({ children }: { children: ReactNode }) => {
   const updateForm = async (formId: string, updatedData: Partial<FormPayload>) => {
     try {
       const payload = { ...updatedData, empresaId: user?.empresaId };
-      const response = await api.put(`/update-formulario/${formId}`, payload);
+      const response = await api.patch(`/update-formulario/${formId}`, payload);
       const updatedForm = mapApiFormToFormulario(response.data);
       setFormularios((current) => current.map((f) => (f.id === formId ? updatedForm : f)));
       toast({ title: "Sucesso", description: "Formulário atualizado!" });

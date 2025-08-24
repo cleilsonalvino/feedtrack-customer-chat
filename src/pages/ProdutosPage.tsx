@@ -172,10 +172,10 @@ export const ProductsPage = () => {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="p-4 md:p-8 space-y-6 m">
+      <div className="flex justify-between items-center flex-wrap mt-10">
         <h1 className="text-3xl font-bold">Gestão de Produtos</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-center ">
           <Button
             variant="outline"
             onClick={() => setIsInactiveModalOpen(true)}

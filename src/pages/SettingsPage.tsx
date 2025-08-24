@@ -79,6 +79,7 @@ export const SettingsPage = () => {
     senhaHash: "",
     empresaId: user?.empresaId || "",
   });
+  const [confirmText, setConfirmText] = useState("");
 
   // --- EFEITOS ---
   useEffect(() => {
@@ -154,7 +155,9 @@ export const SettingsPage = () => {
   };
 
   const handleDeleteCompany = async () => {
+    console.log("user.empresaId:", user.empresaId);
     if (!user?.empresaId) return;
+    console.log("user.empresaId:", user.empresaId);
     try {
       await api.delete(`/empresa/${user.empresaId}`);
       toast({
@@ -192,9 +195,9 @@ export const SettingsPage = () => {
     }
 
     try {
-      const response = await api.get(`/usuarios?empresaId=${user.empresaId}`);
+      const response = await api.get(`/usuarios/${user.empresaId}`);
+      console.log("Resposta da API:", response.data);
       setUsers(response.data);
-      localStorage.setItem("companyUsers", JSON.stringify(response.data));
     } catch (error) {
       console.error("Erro ao buscar utilizadores:", error);
       toast({
@@ -352,8 +355,10 @@ export const SettingsPage = () => {
               </div>
               <div>
                 <Label>Atraso para Envio (horas)</Label>
-                <Select value={feedbackDelay} onValueChange={setFeedbackDelay}
-                disabled={true}
+                <Select
+                  value={feedbackDelay}
+                  onValueChange={setFeedbackDelay}
+                  disabled={true}
                 >
                   <SelectTrigger className="w-32">
                     <SelectValue />
@@ -412,27 +417,19 @@ export const SettingsPage = () => {
                       </DialogDescription>
                     </DialogHeader>
                     <Input
-                      onChange={(e) => {
-                        const confirmButton =
-                          document.getElementById("confirmDeleteBtn");
-                        if (confirmButton) {
-                          confirmButton.toggleAttribute(
-                            "disabled",
-                            e.target.value !== companyName
-                          );
-                        }
-                      }}
+                      value={confirmText}
+                      onChange={(e) => setConfirmText(e.target.value)}
                       placeholder="Digite o nome da empresa"
                     />
                     <DialogFooter>
                       <DialogClose asChild>
                         <Button variant="outline">Cancelar</Button>
                       </DialogClose>
+
                       <Button
-                        id="confirmDeleteBtn"
                         variant="destructive"
                         onClick={handleDeleteCompany}
-                        disabled
+                        disabled={confirmText !== companyName} // habilita somente se digitar correto
                       >
                         Eu compreendo, eliminar a minha empresa
                       </Button>

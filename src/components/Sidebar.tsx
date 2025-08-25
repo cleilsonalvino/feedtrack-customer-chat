@@ -15,23 +15,29 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 
-const getNavigation = (isAdmin: boolean) => {
+const getNavigation = (userType: string) => {
   const baseNavigation = [
+    { name: "Dashboard do Usuário", href: "/user", icon: Users },
     { name: "Clientes", href: "/customers", icon: Users },
-    { name: "Campanhas", href: "/campaigns", icon: MessageSquare },
-    { name: "Produtos", href: "/products", icon: Cylinder },
     { name: "Vendas", href: "/sales", icon: DollarSign },
+    { name: "Produtos", href: "/products", icon: Cylinder },
+    { name: "Campanhas", href: "/campaigns", icon: MessageSquare },
     { name: "Editor de Formulário", href: "/form-builder", icon: FolderKanban },
+
   ];
 
   const adminNavigation = [
     { name: "Dashboard", href: "/home", icon: BarChart3 },
     ...baseNavigation,
+    { name: "Feedbacks", href: "/feedbacks", icon: MessageSquare },
     { name: "Relatórios", href: "/reports", icon: FileBarChart },
     { name: "Configurações", href: "/settings", icon: Settings },
   ];
 
-  return isAdmin ? adminNavigation : baseNavigation;
+  if (userType === "ADMIN" || userType === "SUPER_ADMIN") {
+    return adminNavigation;
+  }
+  return baseNavigation;
 };
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
@@ -42,8 +48,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   const [nomeEmpresa, setNomeEmpresa] = useState<string>("");
   const [tipoUsuario, setTipoUsuario] = useState<string>("");
 
-  const isAdmin = user?.tipo === "ADMIN" || user?.tipo === "SUPER_ADMIN";
-  const navigation = getNavigation(isAdmin);
+  const navigation = getNavigation(user?.tipo || "");
 
   const handleLogout = () => {
     logout();

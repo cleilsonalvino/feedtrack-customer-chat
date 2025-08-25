@@ -4,13 +4,17 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { RecentFeedback } from "@/components/RecentFeedback";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, BarChart3 } from "lucide-react";
+import { MessageSquare, BarChart3, PieChart, LineChart } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 // Importe seus componentes de gráfico
 import { CampaignResponseChart } from "@/components/CampaignResponseChart";
 import { FeedbackDistributionChart } from "@/components/FeedbackDistributionChart";
 import { SatisfactionTrendChart } from "@/components/SatisfactionTrendChart";
+import { FeedbackPerProductChart } from "@/components/FeedbackPerProductChart";
+import { FeedbackPerEmployeeChart } from "@/components/FeedbackPerEmployeeChart";
+import { AverageRatingPerProductChart } from "@/components/AverageRatingPerProductChart";
+import { KeywordsInFeedbackChart } from "@/components/KeywordsInFeedbackChart";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -40,7 +44,7 @@ const Index = () => {
 
       <Tabs defaultValue="dashboard" className="space-y-6">
         {/* A lista de abas agora tem apenas 2 itens, focados em visualização */}
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="flex flex-wrap gap-2 mb-20">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
             Visão Geral
@@ -49,9 +53,13 @@ const Index = () => {
             <MessageSquare className="w-4 h-4" />
             Últimas Avaliações
           </TabsTrigger>
+          <TabsTrigger value="more-charts" className="flex items-center gap-2">
+            <PieChart className="w-4 h-4" />
+            Mais Gráficos
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="space-y-6">
+        <TabsContent value="dashboard" className="">
           <DashboardStats />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <CampaignResponseChart />
@@ -64,6 +72,17 @@ const Index = () => {
 
         <TabsContent value="feedback">
           <RecentFeedback />
+        </TabsContent>
+
+        <TabsContent value="more-charts" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <FeedbackPerProductChart />
+            <FeedbackPerEmployeeChart />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <AverageRatingPerProductChart />
+            <KeywordsInFeedbackChart />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

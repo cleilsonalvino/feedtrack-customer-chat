@@ -40,6 +40,8 @@ export const Login = () => {
       setAlerta({ tipo: "success", mensagem: "Login realizado com sucesso! Redirecionando..." });
       if (user.tipo === 'SUPER_ADMIN') {
         navigate("/admin");
+      } else if (user.tipo === 'USER') {
+        navigate("/user");
       } else {
         navigate("/home");
       }

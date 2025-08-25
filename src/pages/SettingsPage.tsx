@@ -271,33 +271,39 @@ const [userToEdit, setUserToEdit] = useState<{
   };
 
   const handleUpdateUser = async () => {
-  if (!userToEdit) return;
 
-  try {
-    // Exemplo de chamada à API para atualizar o usuário
-    await updateUser(userToEdit.id, {
-      nomeUsuario: userToEdit.nomeUsuario,
-      id: userToEdit.id,
-      status: userToEdit.status || "ATIVO", // Adicione um valor padrão ou trate como opcional
-      senhaHash: userToEdit.senhaHash,
-      tipo: userToEdit.tipo,
-    });
-
-    // Atualiza a lista localmente
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userToEdit.id ? { ...u, ...userToEdit } : u))
-    );
-    
-    setIsEditUserDialogOpen(false);
-    setUserToEdit(null);
-  } catch (err) {
-    console.error(err);
     toast({
-      title: "Erro",
-      description: "Não foi possível atualizar o usuário",
-      variant: "destructive",
+      title: "Funcionalidade não implementada",
+      description: "Não é possível atualizar o usuário",
+      variant: "default",
     });
-  }
+  // if (!userToEdit) return;
+
+  // try {
+  //   // Exemplo de chamada à API para atualizar o usuário
+  //   await updateUser(userToEdit.id, {
+  //     nomeUsuario: userToEdit.nomeUsuario,
+  //     id: userToEdit.id,
+  //     status: userToEdit.status || "ATIVO", // Adicione um valor padrão ou trate como opcional
+  //     senhaHash: userToEdit.senhaHash,
+  //     tipo: userToEdit.tipo,
+  //   });
+
+  //   // Atualiza a lista localmente
+  //   setUsers((prev) =>
+  //     prev.map((u) => (u.id === userToEdit.id ? { ...u, ...userToEdit } : u))
+  //   );
+    
+  //   setIsEditUserDialogOpen(false);
+  //   setUserToEdit(null);
+  // } catch (err) {
+  //   console.error(err);
+  //   toast({
+  //     title: "Erro",
+  //     description: "Não foi possível atualizar o usuário",
+  //     variant: "destructive",
+  //   });
+  // }
 };
 
 
@@ -597,8 +603,9 @@ const [userToEdit, setUserToEdit] = useState<{
   variant="outline"
   size="sm"
   onClick={() => {
-    setUserToEdit(user);
-    setIsEditUserDialogOpen(true);
+    // setUserToEdit(user);
+    // setIsEditUserDialogOpen(true);
+    handleUpdateUser()
   }}
 >
   <Edit className="w-3 h-3" />

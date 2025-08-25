@@ -24,6 +24,8 @@ import { ProductsPage } from "./pages/ProdutosPage";
 import { FormProvider } from "./contexts/FormContext";
 import { Register } from "./pages/Register";
 import { FormsPage } from "./pages/FormsPage";
+import UserPage from "./pages/UserPage";
+import FeedbacksPage from "./pages/FeedbacksPage";
 import { CampaignProvider } from "./contexts/CampaignContext";
 import { FeedBackProvider } from "./contexts/FeedBackContext";
 import { ReportsProvider } from "./contexts/RepostsContext"; // 👈 3. IMPORTA O PROVIDER
@@ -76,6 +78,8 @@ const App = () => (
                           <Route path="/reports" element={<ReportsPage />} />
                           <Route path="/settings" element={<SettingsPage />} />
                           <Route path="/sales" element={<SalesPage />} />
+                          <Route path="/user" element={<UserPage />} />
+                          <Route path="/feedbacks" element={<FeedbacksPage />} />
                           <Route path="*" element={<NotFound />} />
                         </Route>
 

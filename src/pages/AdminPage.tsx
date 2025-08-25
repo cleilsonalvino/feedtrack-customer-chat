@@ -8,6 +8,10 @@ import { FormsChart } from "@/components/FormsChart";
 import { FeedbacksChart } from "@/components/FeedbacksChart";
 import { SalesChart } from "@/components/SalesChart";
 import { CampaignsChart } from "@/components/Campaignchart";
+import { AverageMetricsChart } from "@/components/AverageMetricsChart";
+import { PlanDistributionChart } from "@/components/PlanDistributionChart";
+import { CompanyActivityHeatmap } from "@/components/CompanyActivityHeatmap";
+import { RecentSignupsChart } from "@/components/RecentSignupsChart";
 
 const AdminPage = () => {
   return (
@@ -26,7 +30,11 @@ const AdminPage = () => {
         <FormsChart />
         <FeedbacksChart />
         <SalesChart />
-        <CampaignsChart/>
+        <CampaignsChart />
+        <AverageMetricsChart />
+        <PlanDistributionChart />
+        <CompanyActivityHeatmap />
+        <RecentSignupsChart />
       </div>
       <CompanyList />
     </div>

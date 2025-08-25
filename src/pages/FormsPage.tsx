@@ -419,7 +419,7 @@ const handleCreateForm = async () => {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mt-10">
         <div>
           <h1 className="text-3xl font-bold">Gestão de Formulários</h1>
           <p className="text-muted-foreground">

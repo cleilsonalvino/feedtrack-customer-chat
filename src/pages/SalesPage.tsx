@@ -170,7 +170,7 @@ const SalesPage: React.FC = () => {
   return (
     <div className="container mx-auto p-4 space-y-6">
       {/* Formulário de criação de venda */}
-      <Card>
+      <Card className="mt-10">
         <CardHeader><CardTitle>Criar Nova Venda</CardTitle></CardHeader>
         <CardContent className="grid gap-6 pt-6">
           <div className="grid gap-4 md:grid-cols-3 md:items-start">
@@ -259,6 +259,7 @@ const SalesPage: React.FC = () => {
                       <th className="px-4 py-3 text-left text-sm font-medium">Cliente</th>
                       <th className="px-4 py-3 text-left text-sm font-medium">Produtos</th>
                       <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -271,7 +272,7 @@ const SalesPage: React.FC = () => {
                           {new Date(sale.dataCriacao).toLocaleString("pt-BR")}
                         </td>
                         <td>
-                          <Button onClick={deleteSale(sale.id)}  size="sm" className="hover:bg-muted-foreground/50 bg-red-600">
+                          <Button onClick={deleteSale(sale.id)}  size="sm" className="hover:bg-muted-foreground/50 bg-red-600 m-5">
                             <Trash className="w-4 h-4 " />
                           </Button>
                         </td>

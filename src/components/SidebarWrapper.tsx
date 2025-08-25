@@ -13,9 +13,6 @@ export const SidebarWrapper = () => {
   const { isAuthenticated, loading } = useAuth();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
-  // 3. Lidar com o estado de carregamento inicial
-  // Enquanto o AuthContext verifica se há um token no localStorage, mostramos uma tela de carregamento.
-  // Isso evita que um utilizador logado seja redirecionado para o login por um instante.
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -24,9 +21,6 @@ export const SidebarWrapper = () => {
     );
   }
 
-  // 4. A REGRA DE SEGURANÇA: Se não estiver autenticado, redireciona para /login
-  // O componente <Navigate> do react-router-dom faz o redirecionamento.
-  // 'replace' impede que o utilizador use o botão "voltar" do navegador para aceder à página protegida.
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }

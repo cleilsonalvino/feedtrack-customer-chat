@@ -1,14 +1,14 @@
 // src/pages/CampaignsPage.tsx
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../lib/api"; // Import the api instance
+import api from "../lib/api"; // Importa a instância da api
 import {
   useCampaign,
   Campanha,
   NewCampaignData,
 } from "../contexts/CampaignContext";
-import { useAuth } from "../contexts/AuthContext"; // Import useAuth for consistency
+import { useAuth } from "../contexts/AuthContext"; // Importa useAuth para consistência
 import { useForm } from "../contexts/FormContext";
 import {
   Card,
@@ -18,7 +18,6 @@ import {
 } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Badge } from "../components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -36,40 +35,134 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  Loader2,
-  Send,
-  Mail,
-} from "lucide-react";
+import { Plus, Edit, Trash2, Search, Loader2, Send, Mail } from "lucide-react";
 import { Checkbox } from "../components/ui/checkbox";
 import { useToast } from "../hooks/use-toast";
-import { cn } from "../lib/utils";
-import { format, isValid } from "date-fns"; // Import isValid
-import { ptBR } from "date-fns/locale";
 
-// --- NEW INTERFACE FOR SALE (VENDA) ---
+// --- INTERFACES ---
+interface Produto {
+    id: string;
+    nome: string;
+}
+
+// Interface para Venda, atualizada para suportar múltiplos produtos.
 interface Venda {
   id: string;
   dataVenda: string;
-  clienteId: string; // Keep original IDs for mapping
-  produtoId: string; // Keep original IDs for mapping
+  clienteId: string;
+  produtoIds: string[]; // Alterado para suportar múltiplos IDs de produto
   cliente: {
     id: string;
     nome: string;
   };
-  produto?: {
-    id: string;
-    nome: string;
-  };
+  produto?: Produto[]; // Alterado para uma lista de produtos
   empresaId: string;
 }
 
-// --- MANUAL SEND MODAL COMPONENT ---
-// This component handles the manual sending of a campaign to selected sales.
+
+// --- HOOKS CUSTOMIZADOS PARA DATA FETCHING ---
+
+/**
+ * Hook customizado para buscar vendas e dados relacionados.
+ * Abstrai a lógica de fetching, loading e erro do componente.
+ */
+const useVendas = (isOpen: boolean) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [vendas, setVendas] = useState<Venda[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !user?.empresaId) {
+      setVendas([]);
+      return;
+    }
+
+    const fetchVendas = async () => {
+      setLoading(true);
+      try {
+        const [vendasRes, clientesRes, produtosRes] = await Promise.all([
+          api.get(`/vendas?empresaId=${user.empresaId}`),
+          api.get(`/clientes?empresaId=${user.empresaId}`),
+          api.get(`/produtos?empresaId=${user.empresaId}`),
+        ]);
+
+        console.log(vendasRes.data);
+
+
+        const clienteMap = new Map(clientesRes.data.map((c: any) => [c.id, c]));
+        const produtoMap = new Map(produtosRes.data.map((p: any) => [p.id, p]));
+
+        const vendasCompletas = vendasRes.data.map((venda: any) => ({
+          ...venda,
+          cliente: clienteMap.get(venda.clienteId) || { id: venda.clienteId, nome: "Cliente não encontrado" },
+          produtos: (venda.produtoIds || [])
+            .map((id: string) => produtoMap.get(id))
+            .filter(Boolean), // remove undefined
+        }));
+
+        setVendas(vendasCompletas);
+      } catch (error) {
+        console.error("Erro ao buscar dados para envio manual:", error);
+        toast({
+          title: "Erro ao carregar dados",
+          description: "Não foi possível carregar a lista de vendas.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVendas();
+  }, [isOpen, user?.empresaId, toast]);
+
+  return { vendas, loading };
+};
+
+
+/**
+ * Hook customizado para buscar produtos.
+ */
+const useProdutos = (isOpen: boolean) => {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [produtos, setProdutos] = useState<Produto[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen || !user?.empresaId) {
+            setProdutos([]);
+            return;
+        }
+
+        const fetchProdutos = async () => {
+            setLoading(true);
+            try {
+                const response = await api.get(`/produtos?empresaId=${user.empresaId}`);
+                setProdutos(response.data);
+            } catch (error) {
+                console.error("Erro ao buscar produtos:", error);
+                toast({
+                    title: "Erro ao carregar produtos",
+                    description: "Não foi possível carregar a lista de produtos.",
+                    variant: "destructive",
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProdutos();
+    }, [isOpen, user?.empresaId, toast]);
+
+    return { produtos, loading };
+}
+
+
+// --- COMPONENTES DE MODAL ---
+
+// Componente para o modal de Envio Manual
 const ManualSendModal = ({
   isOpen,
   onOpenChange,
@@ -79,89 +172,50 @@ const ManualSendModal = ({
   onOpenChange: (open: boolean) => void;
   campaign: Campanha | null;
 }) => {
-  const [vendas, setVendas] = useState<Venda[]>([]);
-  const [selectedVendaIds, setSelectedVendaIds] = useState<string[]>([]);
-  const [loadingVendas, setLoadingVendas] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { vendas, loading: loadingVendas } = useVendas(isOpen);
+
+  const [selectedVendaIds, setSelectedVendaIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const { toast } = useToast();
-  const { user } = useAuth(); // Use the user from AuthContext for consistency
 
-  // Fetches sales from the API when the modal is opened.
+  // Limpa o estado quando o modal é fechado
   useEffect(() => {
-    if (isOpen && user?.empresaId) {
-      const fetchVendas = async () => {
-        setLoadingVendas(true);
-        try {
-          // Fetch all data in parallel
-          const [vendasResponse, clientesResponse, produtosResponse] =
-            await Promise.all([
-              api.get(`/vendas?empresaId=${user.empresaId}`),
-              api.get(`/clientes?empresaId=${user.empresaId}`),
-              api.get(`/produtos?empresaId=${user.empresaId}`),
-            ]);
-
-          const vendasData: Venda[] = vendasResponse.data;
-          console.log("[VENDAS CAMPANHA]", vendasData);
-          const clientes = clientesResponse.data;
-          console.log("[CLIENTES CAMPANHA]", clientes);
-          const produtos = produtosResponse.data;
-
-          // Create maps for quick lookups
-          const clienteMap = new Map(clientes.map((c) => [c.id, c]));
-          const produtoMap = new Map(produtos.map((p) => [p.id, p]));
-
-          // Map sales with complete data
-          const vendasCompletas: Venda[] = vendasData.map((venda) => ({
-            ...venda,
-            cliente: clienteMap.get(venda.clienteId) as Venda["cliente"], // << Type assertion
-            produto: produtoMap.get(venda.produtoId) as
-              | Venda["produto"]
-              | undefined,
-          }));
-
-          setVendas(vendasCompletas);
-        } catch (error) {
-          console.error("Erro ao buscar dados:", error);
-          toast({
-            title: "Erro",
-            description: "Não foi possível carregar a lista de vendas.",
-            variant: "destructive",
-          });
-        } finally {
-          setLoadingVendas(false);
-        }
-      };
-
-      fetchVendas();
-    } else {
-      // Clears state when the modal is closed.
-      setSelectedVendaIds([]);
+    if (!isOpen) {
+      setSelectedVendaIds(new Set());
       setSearchTerm("");
     }
-  }, [isOpen, user?.empresaId, toast]);
+  }, [isOpen]);
 
-  // Filters sales based on the search term (client name).
-  const filteredVendas = useMemo(() => {
-    return vendas.filter((venda) =>
-      (venda.cliente?.nome || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-    );
-  }, [vendas, searchTerm]);
+  const filteredVendas = useMemo(() =>
+    vendas.filter((venda) =>
+      venda.cliente.nome.toLowerCase().includes(searchTerm.toLowerCase())
+    ), [vendas, searchTerm]
+  );
 
-  // Handles the "Select All" checkbox functionality.
-  const handleSelectAll = (checked: boolean | "indeterminate") => {
-    if (checked === true) {
-      setSelectedVendaIds(filteredVendas.map((v) => v.id));
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedVendaIds(new Set(filteredVendas.map((v) => v.id)));
     } else {
-      setSelectedVendaIds([]);
+      setSelectedVendaIds(new Set());
     }
   };
 
-  // Handles the manual campaign sending process.
+  const handleSelectVenda = (vendaId: string, checked: boolean) => {
+    setSelectedVendaIds(prev => {
+        const newSet = new Set(prev);
+        if(checked) {
+            newSet.add(vendaId);
+        } else {
+            newSet.delete(vendaId);
+        }
+        return newSet;
+    });
+  };
+
   const handleManualSend = async () => {
-    if (selectedVendaIds.length === 0) {
+    if (selectedVendaIds.size === 0) {
       toast({
         title: "Nenhuma venda selecionada",
         description: "Por favor, selecione ao menos uma venda para o envio.",
@@ -170,11 +224,10 @@ const ManualSendModal = ({
       return;
     }
 
-    if (!campaign || !user?.id || !user.empresaId) {
+    if (!campaign || !user?.empresaId) {
       toast({
         title: "Erro de Autenticação",
-        description:
-          "Dados da campanha ou do usuário não encontrados. Faça login novamente.",
+        description: "Dados da campanha ou do usuário não encontrados.",
         variant: "destructive",
       });
       return;
@@ -182,42 +235,36 @@ const ManualSendModal = ({
 
     setIsSending(true);
 
-    const sendPromises = selectedVendaIds.map((vendaId) => {
-      const venda = vendas.find((v) => v.id === vendaId);
-      console.log("[VENDA ENVIADA]", venda.id);
-      if (!venda) return Promise.resolve();
+    const vendaId = Array.from(selectedVendaIds)[0];
 
-      const payload = {
-        vendaId: venda.id, // ID da venda enviado no JSON
+    const payload = {
+        vendaId,
         empresaId: user.empresaId,
         campanhaId: campaign.id,
-      };
-
-      console.log("[PAYLOAD]", payload);
-
-
-      return api.post("/envio/individual", payload); // API espera o JSON, não URL
-    });
+    };
 
     try {
-      await Promise.all(sendPromises);
-      toast({
-        title: "Envio Concluído!",
-        description: `Campanha "${campaign.titulo}" enviada para ${selectedVendaIds.length} venda(s).`,
-      });
-      onOpenChange(false);
+        // Idealmente, a API deveria aceitar um array de IDs para processamento em lote
+        await api.post("/envio/individual", payload);
+        toast({
+            title: "Envio Concluído!",
+            description: `Campanha "${campaign.titulo}" enviada para ${selectedVendaIds.size} venda(s).`,
+        });
+        onOpenChange(false);
     } catch (error) {
-      console.error("Erro no envio em massa:", error);
-      toast({
-        title: "Erro no Envio",
-        description:
-          "Ocorreu um erro ao enviar a campanha para uma ou mais vendas.",
-        variant: "destructive",
-      });
+        console.error("Erro no envio em massa:", error);
+        toast({
+            title: "Erro no Envio",
+            description: "Ocorreu um erro ao enviar a campanha. Tente novamente.",
+            variant: "destructive",
+        });
     } finally {
-      setIsSending(false);
+        setIsSending(false);
     }
   };
+
+  const allSelected = selectedVendaIds.size > 0 && selectedVendaIds.size === filteredVendas.length;
+  const someSelected = selectedVendaIds.size > 0 && !allSelected;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -228,8 +275,7 @@ const ManualSendModal = ({
             Selecione as vendas para enviar a campanha{" "}
             <span className="font-semibold text-primary">
               "{campaign?.titulo}"
-            </span>
-            .
+            </span>.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
@@ -246,40 +292,33 @@ const ManualSendModal = ({
               </div>
             ) : (
               <>
-                <div className="flex items-center space-x-2 p-2">
+                <div className="flex items-center space-x-2 p-2 sticky top-0 bg-background">
                   <Checkbox
                     id="select-all-vendas"
-                    onCheckedChange={handleSelectAll}
-                    checked={
-                      filteredVendas.length > 0 &&
-                      selectedVendaIds.length === filteredVendas.length
-                    }
+                    onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                    aria-label="Selecionar todas as vendas"
                   />
                   <Label htmlFor="select-all-vendas" className="font-semibold">
                     Selecionar Todas
                   </Label>
                 </div>
                 {filteredVendas.map((venda) => (
+                  
                   <div
                     key={venda.id}
                     className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50"
                   >
                     <Checkbox
                       id={venda.id}
-                      checked={selectedVendaIds.includes(venda.id)}
-                      onCheckedChange={(checked) => {
-                        setSelectedVendaIds((prev) =>
-                          checked
-                            ? [...prev, venda.id]
-                            : prev.filter((id) => id !== venda.id)
-                        );
-                      }}
+                      checked={selectedVendaIds.has(venda.id)}
+                      onCheckedChange={(checked) => handleSelectVenda(venda.id, checked as boolean)}
                     />
-                    <Label htmlFor={venda.id} className="w-full cursor-pointer">
-                      {/* --- FIX: Use optional chaining for produto.nome --- */}
-                      {venda.cliente?.nome || "Cliente desconhecido"} -{" "}
-                      {venda.produto?.nome || "Produto desconhecido"}
-                    </Label>
+                  <Label htmlFor={venda.id} className="w-full cursor-pointer">
+                    {venda.cliente?.nome || "Cliente desconhecido"} -{" "}
+                    {venda.produto?.map(p => p.nome).join(", ") || "Produto não especificado"}
+                  </Label>
+
                   </div>
                 ))}
               </>
@@ -290,9 +329,9 @@ const ManualSendModal = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleManualSend} disabled={isSending}>
+          <Button onClick={handleManualSend} disabled={isSending || selectedVendaIds.size === 0}>
             {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Enviar para ({selectedVendaIds.length})
+            Enviar para ({selectedVendaIds.size})
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -300,7 +339,7 @@ const ManualSendModal = ({
   );
 };
 
-// --- BULK SEND MODAL COMPONENT ---
+// Componente para o modal de Envio em Massa
 const BulkSendModal = ({
   isOpen,
   onOpenChange,
@@ -310,36 +349,17 @@ const BulkSendModal = ({
   onOpenChange: (open: boolean) => void;
   campaign: Campanha | null;
 }) => {
-  const [produtos, setProdutos] = useState<{ id: string; nome: string }[]>([]);
-  const [selectedProdutoId, setSelectedProdutoId] = useState<string | null>(null);
-  const [loadingProdutos, setLoadingProdutos] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const { toast } = useToast();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const { produtos, loading: loadingProdutos } = useProdutos(isOpen);
+  const [selectedProdutoId, setSelectedProdutoId] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
-    if (isOpen && user?.empresaId) {
-      const fetchProdutos = async () => {
-        setLoadingProdutos(true);
-        try {
-          const response = await api.get(`/produtos?empresaId=${user.empresaId}`);
-          setProdutos(response.data);
-        } catch (error) {
-          console.error("Erro ao buscar produtos:", error);
-          toast({
-            title: "Erro",
-            description: "Não foi possível carregar a lista de produtos.",
-            variant: "destructive",
-          });
-        } finally {
-          setLoadingProdutos(false);
-        }
-      };
-      fetchProdutos();
-    } else {
+    if (!isOpen) {
       setSelectedProdutoId(null);
     }
-  }, [isOpen, user?.empresaId, toast]);
+  }, [isOpen]);
 
   const handleBulkSend = async () => {
     if (!selectedProdutoId) {
@@ -351,10 +371,10 @@ const BulkSendModal = ({
       return;
     }
 
-    if (!campaign || !user?.id || !user.empresaId) {
+    if (!campaign || !user?.empresaId) {
       toast({
         title: "Erro de Autenticação",
-        description: "Dados da campanha ou do usuário não encontrados. Faça login novamente.",
+        description: "Dados da campanha ou do usuário não encontrados.",
         variant: "destructive",
       });
       return;
@@ -395,8 +415,8 @@ const BulkSendModal = ({
             Selecione um produto para enviar a campanha{" "}
             <span className="font-semibold text-primary">
               "{campaign?.titulo}"
-            </span>
-            {" "}para todos os clientes que o compraram.
+            </span>{" "}
+            para todos os clientes que o compraram.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
@@ -405,7 +425,10 @@ const BulkSendModal = ({
               <Loader2 className="animate-spin" />
             </div>
           ) : (
-            <Select onValueChange={setSelectedProdutoId} value={selectedProdutoId || ""}>
+            <Select
+              onValueChange={setSelectedProdutoId}
+              value={selectedProdutoId || ""}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione um produto..." />
               </SelectTrigger>
@@ -423,7 +446,10 @@ const BulkSendModal = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleBulkSend} disabled={isSending || loadingProdutos}>
+          <Button
+            onClick={handleBulkSend}
+            disabled={isSending || loadingProdutos || !selectedProdutoId}
+          >
             {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Enviar em Massa
           </Button>
@@ -434,57 +460,51 @@ const BulkSendModal = ({
 };
 
 
-// --- MAIN CAMPAIGNS PAGE COMPONENT ---
-export const CampaignsPage = () => {
-  const { campaigns, addCampaign, updateCampaign, deleteCampaign, loading } =
-    useCampaign();
-  const { formularios } = useForm();
-  const navigate = useNavigate();
-  const { toast } = useToast();
+// --- COMPONENTE PRINCIPAL DA PÁGINA ---
 
-  // State for UI elements and forms
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState<Campanha | null>(null);
-  const [manualSendState, setManualSendState] = useState({
-    isOpen: false,
-    campaign: null,
-  });
-  const [bulkSendState, setBulkSendState] = useState({
-    isOpen: false,
-    campaign: null,
-  });
-
-  // State for the new campaign creation form
-  const [newCampaign, setNewCampaign] = useState<
-    Omit<NewCampaignData, "formularioId" | "empresaId">
-  >({
+const INITIAL_CAMPAIGN_STATE: Omit<NewCampaignData, "formularioId" | "empresaId"> = {
     titulo: "",
     descricao: "",
     canalEnvio: "EMAIL",
     templateMensagem:
       "Olá [Nome do Cliente],\n\nEsperamos que você esteja aproveitando o [Nome do Produto].\nGostaríamos de saber: o produto atendeu às suas expectativas?\nSua avaliação nos ajuda a melhorar e oferecer sempre o melhor para você.\nPor favor, deixe seu feedback no link abaixo:\n\nAgradecemos pela sua confiança!\n\nAtenciosamente, \n[Nome da Empresa]",
+};
+
+export const CampaignsPage = () => {
+  const { campaigns, addCampaign, updateCampaign, deleteCampaign, loading } = useCampaign();
+  const { formularios } = useForm();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<Campanha | null>(null);
+  const [manualSendState, setManualSendState] = useState<{isOpen: boolean, campaign: Campanha | null}>({
+    isOpen: false,
+    campaign: null,
   });
+  const [bulkSendState, setBulkSendState] = useState<{isOpen: boolean, campaign: Campanha | null}>({
+    isOpen: false,
+    campaign: null,
+  });
+
+  const [newCampaign, setNewCampaign] = useState(INITIAL_CAMPAIGN_STATE);
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
 
-  // Memoized list of unique campaigns to prevent duplicates in the UI
   const uniqueCampaigns = useMemo(() => {
     if (!campaigns) return [];
     return Array.from(new Map(campaigns.map((c) => [c.id, c])).values());
   }, [campaigns]);
 
-  // Filters campaigns based on the search term
   const filteredCampaigns = uniqueCampaigns.filter((c) =>
     (c.titulo || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Opens the create modal, checking if forms exist first
   const handleOpenCreateModal = () => {
     if (formularios.length === 0) {
       toast({
         title: "Nenhum formulário encontrado",
-        description:
-          "É necessário criar um formulário antes de criar uma campanha.",
+        description: "É necessário criar um formulário antes de criar uma campanha.",
         variant: "destructive",
       });
       navigate("/form-builder");
@@ -493,61 +513,43 @@ export const CampaignsPage = () => {
     setIsCreateDialogOpen(true);
   };
 
-  // Handles the creation of a new campaign
   const handleCreateCampaign = async () => {
-    if (
-      !newCampaign.titulo.trim() ||
-      !newCampaign.templateMensagem.trim() ||
-      !selectedFormId
-    ) {
+    if (!newCampaign.titulo.trim() || !newCampaign.templateMensagem.trim() || !selectedFormId) {
       toast({
-        title: "Erro",
-        description: "Título, template e um formulário são obrigatórios.",
+        title: "Erro de Validação",
+        description: "Título, template da mensagem e um formulário são obrigatórios.",
         variant: "destructive",
       });
       return;
     }
 
-    // The context will add the 'empresaId' automatically
-    const payload: Omit<NewCampaignData, "empresaId"> = {
-      ...newCampaign,
-      formularioId: selectedFormId,
-    };
+    const payload = { ...newCampaign, formularioId: selectedFormId };
+    const success = await addCampaign(payload as NewCampaignData);
 
-    const created = await addCampaign(payload as NewCampaignData);
-    if (created) {
+    if (success) {
       setIsCreateDialogOpen(false);
-      // Reset form state
-      setNewCampaign({
-        titulo: "",
-        descricao: "",
-        canalEnvio: "EMAIL",
-        templateMensagem: "",
-      });
+      setNewCampaign(INITIAL_CAMPAIGN_STATE);
       setSelectedFormId(null);
     }
   };
 
-  // Handles updating an existing campaign
   const handleUpdateCampaign = async () => {
     if (!editingCampaign) return;
-    // The context expects the ID and a partial object of the data to update
     await updateCampaign(editingCampaign.id, editingCampaign);
     setEditingCampaign(null);
   };
 
-  // Deletes a campaign (soft delete as handled by the context)
   const handleDeleteCampaign = async (id: string) => {
+    // Substituindo window.confirm por um modal de confirmação customizado (se disponível)
+    // ou mantendo-o como um placeholder.
     if (window.confirm("Tem certeza que deseja desativar esta campanha?")) {
       await deleteCampaign(id);
     }
   };
 
-
-
   return (
     <div className="space-y-6 p-4 md:p-8 mt-8">
-      <div className="flex justify-between items-center flex-wrap">
+      <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold">Gestão de Campanhas</h1>
           <p className="text-muted-foreground">
@@ -582,83 +584,48 @@ export const CampaignsPage = () => {
           ) : (
             <div className="space-y-4">
               {filteredCampaigns.map((campaign) => (
-<div
-  key={campaign.id}
-  className="border rounded-xl p-4 hover:shadow-lg transition-shadow duration-200 bg-white"
->
-  <div className="flex justify-between items-start flex-wrap gap-2">
-    <div className="flex flex-col gap-2">
-      {/* Título da campanha */}
-      <h3 className="text-lg font-semibold text-gray-900">{campaign.titulo}</h3>
-      
-      {/* Descrição */}
-      <p className="text-sm text-gray-600">{campaign.descricao}</p>
-      
-      {/* Formulário associado */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-gray-500">Formulário:</span>
-        <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-800 text-xs font-medium">
-          {campaign.formularioId || "Não definido"}
-        </span>
-      </div>
-      
-      {/* Canal de envio */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-gray-500">Canal de Envio:</span>
-        {campaign.canalEnvio === "EMAIL" ? (
-          <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
-            Email
-          </span>
-        ) : (
-          <span className="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium">
-            WhatsApp
-          </span>
-        )}
-      </div>
-    </div>
+                <div
+                  key={campaign.id}
+                  className="border rounded-xl p-4 hover:shadow-lg transition-shadow duration-200 bg-white"
+                >
+                  <div className="flex justify-between items-start flex-wrap gap-2">
+                    <div className="flex flex-col gap-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {campaign.titulo}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {campaign.descricao}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm text-gray-500">Formulário:</span>
+                        <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-800 text-xs font-medium">
+                          {formularios.find(f => f.id === campaign.formularioId)?.titulo || "Não definido"}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm text-gray-500">Canal de Envio:</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${campaign.canalEnvio === 'EMAIL' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                          {campaign.canalEnvio}
+                        </span>
+                      </div>
+                    </div>
 
-    {/* Ações */}
-    <div className="flex gap-2 flex-wrap">
-      <Button
-        size="sm"
-        variant="outline"
-        title="Envio Manual"
-        onClick={() =>
-          setManualSendState({ isOpen: true, campaign: campaign })
-        }
-      >
-        <Send className="w-3 h-3" />
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        title="Envio em Massa"
-        onClick={() =>
-          setBulkSendState({ isOpen: true, campaign: campaign })
-        }
-      >
-        <Mail className="w-3 h-3" />
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        title="Editar Campanha"
-        onClick={() => setEditingCampaign(campaign)}
-      >
-        <Edit className="w-3 h-3" />
-      </Button>
-      <Button
-        size="sm"
-        variant="destructive"
-        title="Desativar Campanha"
-        onClick={() => handleDeleteCampaign(campaign.id)}
-      >
-        <Trash2 className="w-3 h-3" />
-      </Button>
-    </div>
-  </div>
-</div>
-
+                    <div className="flex gap-2 flex-wrap">
+                      <Button size="sm" variant="outline" title="Envio Manual" onClick={() => setManualSendState({ isOpen: true, campaign })}>
+                        <Send className="w-3 h-3" />
+                      </Button>
+                      <Button size="sm" variant="outline" title="Envio em Massa" onClick={() => setBulkSendState({ isOpen: true, campaign })}>
+                        <Mail className="w-3 h-3" />
+                      </Button>
+                      <Button size="sm" variant="outline" title="Editar Campanha" onClick={() => setEditingCampaign(campaign)}>
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                      <Button size="sm" variant="destructive" title="Desativar Campanha" onClick={() => handleDeleteCampaign(campaign.id)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -677,59 +644,25 @@ export const CampaignsPage = () => {
           <div className="space-y-4 py-4">
             <div>
               <Label htmlFor="name">Nome da Campanha *</Label>
-              <Input
-                id="name"
-                value={newCampaign.titulo}
-                onChange={(e) =>
-                  setNewCampaign({ ...newCampaign, titulo: e.target.value })
-                }
-              />
+              <Input id="name" value={newCampaign.titulo} onChange={(e) => setNewCampaign({ ...newCampaign, titulo: e.target.value })}/>
             </div>
             <div>
               <Label htmlFor="description">Descrição</Label>
-              <Textarea
-                id="description"
-                value={newCampaign.descricao}
-                onChange={(e) =>
-                  setNewCampaign({
-                    ...newCampaign,
-                    descricao: e.target.value,
-                  })
-                }
-              />
+              <Textarea id="description" value={newCampaign.descricao} onChange={(e) => setNewCampaign({ ...newCampaign, descricao: e.target.value })}/>
             </div>
             <div>
               <Label htmlFor="form">Formulário *</Label>
-              <Select
-                onValueChange={setSelectedFormId}
-                value={selectedFormId || ""}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um formulário..." />
-                </SelectTrigger>
+              <Select onValueChange={setSelectedFormId} value={selectedFormId || ""}>
+                <SelectTrigger><SelectValue placeholder="Selecione um formulário..." /></SelectTrigger>
                 <SelectContent>
-                  {formularios.map((form) => (
-                    <SelectItem key={form.id} value={form.id}>
-                      {form.titulo}
-                    </SelectItem>
-                  ))}
+                  {formularios.map((form) => (<SelectItem key={form.id} value={form.id}>{form.titulo}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
             <div className="col-span-2">
               <Label htmlFor="channel">Canal de Envio</Label>
-              <Select
-                value={newCampaign.canalEnvio}
-                onValueChange={(v) =>
-                  setNewCampaign({
-                    ...newCampaign,
-                    canalEnvio: v as "EMAIL" | "WHATSAPP",
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um canal..." />
-                </SelectTrigger>
+              <Select value={newCampaign.canalEnvio} onValueChange={(v) => setNewCampaign({ ...newCampaign, canalEnvio: v as "EMAIL" | "WHATSAPP" })}>
+                <SelectTrigger><SelectValue placeholder="Selecione um canal..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
                   <SelectItem value="EMAIL">Email</SelectItem>
@@ -738,44 +671,22 @@ export const CampaignsPage = () => {
             </div>
             <div className="col-span-2">
               <Label htmlFor="template">Template da Mensagem *</Label>
-              <Textarea
-                id="template"
-                value={newCampaign.templateMensagem}
-                onChange={(e) =>
-                  setNewCampaign({
-                    ...newCampaign,
-                    templateMensagem: e.target.value,
-                  })
-                }
-              />
+              <Textarea id="template" value={newCampaign.templateMensagem} onChange={(e) => setNewCampaign({ ...newCampaign, templateMensagem: e.target.value })} rows={8}/>
             </div>
-            <p className="text-600 text-sm bg-slate-100">
-              Crie sua mensagem usando os placeholders{" "}
-              <span className="text-orange-600">[Nome do Cliente]</span>,{" "}
-              <span className="text-orange-600">[Nome do Produto]</span> e{" "}
-              <span className="text-orange-600">[Nome da Empresa]</span>; eles
-              serão substituídos automaticamente pelos dados reais.
+            <p className="text-sm text-muted-foreground p-2 bg-slate-50 rounded-md">
+              Use os placeholders <code className="text-orange-600">[Nome do Cliente]</code>, <code className="text-orange-600">[Nome do Produto]</code>, e <code className="text-orange-600">[Nome da Empresa]</code>.
             </p>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setIsCreateDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancelar</Button>
               <Button onClick={handleCreateCampaign}>Criar Campanha</Button>
-            </div>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Edit Campaign Modal */}
       {editingCampaign && (
-        <Dialog
-          open={!!editingCampaign}
-          onOpenChange={() => setEditingCampaign(null)}
-        >
+        <Dialog open={!!editingCampaign} onOpenChange={() => setEditingCampaign(null)}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Editar Campanha</DialogTitle>
@@ -785,68 +696,26 @@ export const CampaignsPage = () => {
             </DialogHeader>
             <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
               <div>
-                <Label htmlFor="name">Nome da Campanha *</Label>
-                <Input
-                  id="name"
-                  value={editingCampaign.titulo}
-                  onChange={(e) =>
-                    setEditingCampaign({
-                      ...editingCampaign,
-                      titulo: e.target.value,
-                    })
-                  }
-                />
+                <Label htmlFor="edit-name">Nome da Campanha *</Label>
+                <Input id="edit-name" value={editingCampaign.titulo} onChange={(e) => setEditingCampaign({ ...editingCampaign, titulo: e.target.value })}/>
               </div>
               <div>
-                <Label htmlFor="description">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={editingCampaign.descricao}
-                  onChange={(e) =>
-                    setEditingCampaign({
-                      ...editingCampaign,
-                      descricao: e.target.value,
-                    })
-                  }
-                />
+                <Label htmlFor="edit-description">Descrição</Label>
+                <Textarea id="edit-description" value={editingCampaign.descricao} onChange={(e) => setEditingCampaign({ ...editingCampaign, descricao: e.target.value })}/>
               </div>
               <div>
-                <Label htmlFor="form">Formulário *</Label>
-                <Select
-                  onValueChange={(value) =>
-                    setEditingCampaign({
-                      ...editingCampaign,
-                      formularioId: value,
-                    })
-                  }
-                  value={editingCampaign.formularioId || ""}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um formulário..." />
-                  </SelectTrigger>
+                <Label htmlFor="edit-form">Formulário *</Label>
+                <Select onValueChange={(value) => setEditingCampaign({ ...editingCampaign, formularioId: value })} value={editingCampaign.formularioId || ""}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um formulário..." /></SelectTrigger>
                   <SelectContent>
-                    {formularios.map((form) => (
-                      <SelectItem key={form.id} value={form.id}>
-                        {form.titulo}
-                      </SelectItem>
-                    ))}
+                    {formularios.map((form) => (<SelectItem key={form.id} value={form.id}>{form.titulo}</SelectItem>))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="col-span-2">
-                <Label htmlFor="channel">Canal de Envio</Label>
-                <Select
-                  value={editingCampaign.canalEnvio}
-                  onValueChange={(v) =>
-                    setEditingCampaign({
-                      ...editingCampaign,
-                      canalEnvio: v as "EMAIL" | "WHATSAPP",
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um canal..." />
-                  </SelectTrigger>
+                <Label htmlFor="edit-channel">Canal de Envio</Label>
+                <Select value={editingCampaign.canalEnvio} onValueChange={(v) => setEditingCampaign({ ...editingCampaign, canalEnvio: v as "EMAIL" | "WHATSAPP" })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um canal..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
                     <SelectItem value="EMAIL">Email</SelectItem>
@@ -854,49 +723,20 @@ export const CampaignsPage = () => {
                 </Select>
               </div>
               <div className="col-span-2">
-                <Label htmlFor="template">Template da Mensagem *</Label>
-                <Textarea
-                  id="template"
-                  value={editingCampaign.templateMensagem}
-                  onChange={(e) =>
-                    setEditingCampaign({
-                      ...editingCampaign,
-                      templateMensagem: e.target.value,
-                    })
-                  }
-                />
+                <Label htmlFor="edit-template">Template da Mensagem *</Label>
+                <Textarea id="edit-template" value={editingCampaign.templateMensagem} onChange={(e) => setEditingCampaign({ ...editingCampaign, templateMensagem: e.target.value })} rows={8}/>
               </div>
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setEditingCampaign(null)}
-              >
-                Cancelar
-              </Button>
+              <Button variant="outline" onClick={() => setEditingCampaign(null)}>Cancelar</Button>
               <Button onClick={handleUpdateCampaign}>Salvar Alterações</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
 
-      {/* Manual Send Modal */}
-      <ManualSendModal
-        isOpen={manualSendState.isOpen}
-        onOpenChange={(open) =>
-          setManualSendState({ isOpen: open, campaign: null })
-        }
-        campaign={manualSendState.campaign}
-      />
-
-      {/* Bulk Send Modal */}
-      <BulkSendModal
-        isOpen={bulkSendState.isOpen}
-        onOpenChange={(open) =>
-          setBulkSendState({ isOpen: open, campaign: null })
-        }
-        campaign={bulkSendState.campaign}
-      />
+      <ManualSendModal isOpen={manualSendState.isOpen} onOpenChange={(open) => setManualSendState({ isOpen: open, campaign: open ? manualSendState.campaign : null })} campaign={manualSendState.campaign}/>
+      <BulkSendModal isOpen={bulkSendState.isOpen} onOpenChange={(open) => setBulkSendState({ isOpen: open, campaign: open ? bulkSendState.campaign : null })} campaign={bulkSendState.campaign}/>
     </div>
   );
 };

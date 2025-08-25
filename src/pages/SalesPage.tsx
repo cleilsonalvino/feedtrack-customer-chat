@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
-import { Input } from "../components/ui/input"; // Importado para o filtro
+import { Input } from "../components/ui/input";
 import { useToast } from "../hooks/use-toast";
 import {
   Select,
@@ -15,25 +15,25 @@ import { useProduct } from "../contexts/ProductContext";
 import { useAuth } from "../contexts/AuthContext";
 import api from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Filter, ChevronLeft, ChevronRight } from "lucide-react"; // Novos ícones
+import { Clock, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
-// Interface estendida para ajudar na filtragem
+// Interface atualizada para suportar múltiplos produtos
 interface Sale {
   id: string;
   clienteId: string;
-  produtoId: string;
+  produtoIds: string[]; // Alterado de produtoId para produtoIds
   clienteNome: string;
-  produtoNome: string;
+  produtoNomes: string[]; // Alterado de produtoNome para produtoNomes
   dataCriacao: string;
 }
 
 const SalesPage: React.FC = () => {
   // --- ESTADOS ---
-  // Estados para o formulário de criação
   const [newSaleClientId, setNewSaleClientId] = useState("");
-  const [newSaleProductId, setNewSaleProductId] = useState("");
-  
-  // Estado principal para todas as vendas
+  // Estado para múltiplos produtos
+  const [newSaleProductIds, setNewSaleProductIds] = useState<string[]>([]);
+
   const [sales, setSales] = useState<Sale[]>([]);
   const [loadingSales, setLoadingSales] = useState(true);
 
@@ -52,32 +52,27 @@ const SalesPage: React.FC = () => {
 
   // --- Otimização: Buscar e processar vendas ---
   useEffect(() => {
-    // Só prosseguir quando os dados essenciais estiverem prontos
     if (loadingCustomers || loadingProducts || !user?.empresaId) return;
 
     const fetchAndProcessSales = async () => {
       try {
         setLoadingSales(true);
-
-        // 1. Criar "mapas" para busca rápida de nomes (muito eficiente)
         const customerMap = new Map(customers.map(c => [c.id, c.nome]));
         const productMap = new Map(products.map(p => [p.id, p.nome]));
 
-        // 2. Buscar todas as vendas de uma só vez
         const res = await api.get(`/vendas?empresaId=${user.empresaId}`);
         const vendasData = res.data;
 
-        // 3. Processar em memória, sem novas chamadas à API
+        // Processar vendas com múltiplos produtos
         const vendasComNomes: Sale[] = vendasData.map((v: any) => ({
           id: v.id,
           clienteId: v.clienteId,
-          produtoId: v.produtoId,
+          produtoIds: v.produtoId || [], // Garante que seja um array
           clienteNome: customerMap.get(v.clienteId) || "Cliente desconhecido",
-          produtoNome: productMap.get(v.produtoId) || "Produto desconhecido",
+          produtoNomes: (v.produtoId || []).map((pId: string) => productMap.get(pId) || "Produto desconhecido"),
           dataCriacao: v.dataCriacao || new Date().toISOString(),
         }));
 
-        // 4. Ordenar e definir o estado
         vendasComNomes.sort((a, b) => new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime());
         setSales(vendasComNomes);
       } catch (err) {
@@ -95,9 +90,10 @@ const SalesPage: React.FC = () => {
   const filteredSales = useMemo(() => {
     return sales.filter(sale =>
       (sale.clienteNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       sale.produtoNome.toLowerCase().includes(searchTerm.toLowerCase())) &&
+       sale.produtoNomes.some(name => name.toLowerCase().includes(searchTerm.toLowerCase()))) &&
       (filterClientId === "" || sale.clienteId === filterClientId) &&
-      (filterProductId === "" || sale.produtoId === filterProductId)
+      // Filtra se algum dos produtos da venda corresponde ao filtro
+      (filterProductId === "" || sale.produtoIds.includes(filterProductId))
     );
   }, [sales, searchTerm, filterClientId, filterProductId]);
 
@@ -107,31 +103,44 @@ const SalesPage: React.FC = () => {
     return filteredSales.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredSales, currentPage]);
 
-  // --- HANDLERS (Ações do usuário) ---
+
+  // --- HANDLERS ---
+  const handleAddProduct = (productId: string) => {
+    if (productId && !newSaleProductIds.includes(productId)) {
+      setNewSaleProductIds(prev => [...prev, productId]);
+    }
+  };
+
+  const handleRemoveProduct = (productId: string) => {
+    setNewSaleProductIds(prev => prev.filter(id => id !== productId));
+  };
+
   const handleCreateSale = async () => {
-    if (!newSaleClientId || !newSaleProductId || !user?.empresaId) {
-      toast({ title: "Erro", description: "Selecione um cliente e um produto.", variant: "destructive" });
+    if (!newSaleClientId || newSaleProductIds.length === 0 || !user?.empresaId) {
+      toast({ title: "Erro", description: "Selecione um cliente e pelo menos um produto.", variant: "destructive" });
       return;
     }
     try {
-      const payload = { clienteId: newSaleClientId, produtoId: newSaleProductId, empresaId: user.empresaId };
+      // Payload com array de IDs de produto
+      const payload = { clienteId: newSaleClientId, produtoId: newSaleProductIds, empresaId: user.empresaId };
       const response = await api.post("/venda", payload);
-      const customerName = customers.find(c => c.id === newSaleClientId)?.nome || "";
-      const productName = products.find(p => p.id === newSaleProductId)?.nome || "";
 
-      // Adiciona a nova venda no topo da lista, sem precisar buscar tudo de novo
+      const customerName = customers.find(c => c.id === newSaleClientId)?.nome || "";
+      const productNames = newSaleProductIds.map(pId => products.find(p => p.id === pId)?.nome || "");
+
+      // Adiciona a nova venda no topo da lista
       setSales(prev => [{
         id: response.data.id,
         clienteId: newSaleClientId,
-        produtoId: newSaleProductId,
+        produtoIds: newSaleProductIds,
         clienteNome: customerName,
-        produtoNome: productName,
+        produtoNomes: productNames,
         dataCriacao: new Date().toISOString(),
       }, ...prev]);
 
       toast({ title: "Sucesso!", description: `Venda para ${customerName} criada.` });
       setNewSaleClientId("");
-      setNewSaleProductId("");
+      setNewSaleProductIds([]);
     } catch (error) {
       console.error("Erro ao criar venda:", error);
       toast({ title: "Erro", description: "Não foi possível criar a venda.", variant: "destructive" });
@@ -151,62 +160,75 @@ const SalesPage: React.FC = () => {
       {/* Formulário de criação de venda */}
       <Card>
         <CardHeader><CardTitle>Criar Nova Venda</CardTitle></CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3 md:items-end pt-6">
-          <div className="grid gap-1.5">
-            <Label htmlFor="clientId">Cliente</Label>
-            <Select onValueChange={setNewSaleClientId} value={newSaleClientId} disabled={loadingCustomers}>
-              <SelectTrigger><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
-              <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-            </Select>
+        <CardContent className="grid gap-6 pt-6">
+          <div className="grid gap-4 md:grid-cols-3 md:items-start">
+            <div className="grid gap-1.5">
+              <Label htmlFor="clientId">Cliente</Label>
+              <Select onValueChange={setNewSaleClientId} value={newSaleClientId} disabled={loadingCustomers}>
+                <SelectTrigger><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
+                <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5 md:col-span-2">
+              <Label htmlFor="productId">Produtos</Label>
+              <Select onValueChange={handleAddProduct} value="" disabled={loadingProducts}>
+                <SelectTrigger><SelectValue placeholder="Adicionar um produto..." /></SelectTrigger>
+                <SelectContent>{products.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="productId">Produto</Label>
-            <Select onValueChange={setNewSaleProductId} value={newSaleProductId} disabled={loadingProducts}>
-              <SelectTrigger><SelectValue placeholder="Selecione um produto" /></SelectTrigger>
-              <SelectContent>{products.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <Button onClick={handleCreateSale} disabled={loadingCustomers || loadingProducts}>
+
+          {/* Badges dos produtos selecionados */}
+          {newSaleProductIds.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t mt-4">
+              {newSaleProductIds.map(id => {
+                const product = products.find(p => p.id === id);
+                return (
+                  <Badge key={id} variant="secondary" className="flex items-center gap-2">
+                    {product?.nome}
+                    <button onClick={() => handleRemoveProduct(id)} className="rounded-full hover:bg-muted-foreground/20 p-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
+
+          <Button onClick={handleCreateSale} disabled={loadingCustomers || loadingProducts} className="w-full md:w-auto md:justify-self-end mt-4">
             Criar Venda
           </Button>
         </CardContent>
       </Card>
 
-      {/* Card de Filtros e Lista de Vendas combinados */}
+      {/* Card de Filtros e Lista de Vendas */}
       <Card>
- <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle>Vendas Recentes</CardTitle>
-          {/* BOTÃO PARA LIMPAR FILTROS (MELHORA A EXPERIÊNCIA DO USUÁRIO) */}
-          <Button variant="ghost" size="sm" onClick={resetFilters}>
-            Limpar Filtros
-          </Button>
-        </div>
-      </CardHeader>
+        <CardHeader>
+            <div className="flex flex-wrap gap-4 justify-between items-center">
+                <CardTitle>Vendas Recentes</CardTitle>
+                <Button variant="ghost" size="sm" onClick={resetFilters}>
+                    Limpar Filtros
+                </Button>
+            </div>
+        </CardHeader>
         <CardContent>
           {/* Controles de Filtro */}
-        <div className="grid gap-4 md:grid-cols-3 mb-6 p-4 border rounded-lg bg-muted/50">
-          <Input
-            placeholder="Buscar por nome..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="md:col-span-3" // Ocupa a linha toda em telas maiores
-          />
-          <Select value={filterClientId} onValueChange={(val) => { setFilterClientId(val); setCurrentPage(1); }}>
-            <SelectTrigger><SelectValue placeholder="Filtrar por cliente" /></SelectTrigger>
-            <SelectContent>
-              {/* REMOVIDO: <SelectItem value="">Todos os Clientes</SelectItem> */}
-              {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterProductId} onValueChange={(val) => { setFilterProductId(val); setCurrentPage(1); }}>
-            <SelectTrigger><SelectValue placeholder="Filtrar por produto" /></SelectTrigger>
-            <SelectContent>
-              {/* REMOVIDO: <SelectItem value="">Todos os Produtos</SelectItem> */}
-              {products.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+          <div className="grid gap-4 md:grid-cols-3 mb-6 p-4 border rounded-lg bg-muted/50">
+            <Input
+              placeholder="Buscar por nome de cliente ou produto..."
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="md:col-span-3"
+            />
+            <Select value={filterClientId} onValueChange={(val) => { setFilterClientId(val); setCurrentPage(1); }}>
+              <SelectTrigger><SelectValue placeholder="Filtrar por cliente" /></SelectTrigger>
+              <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={filterProductId} onValueChange={(val) => { setFilterProductId(val); setCurrentPage(1); }}>
+              <SelectTrigger><SelectValue placeholder="Filtrar por produto" /></SelectTrigger>
+              <SelectContent>{products.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
 
           {/* Lista de Vendas */}
           {loadingSales ? (
@@ -223,7 +245,7 @@ const SalesPage: React.FC = () => {
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="px-4 py-3 text-left text-sm font-medium">Cliente</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Produto</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Produtos</th>
                       <th className="px-4 py-3 text-left text-sm font-medium">Data</th>
                     </tr>
                   </thead>
@@ -231,7 +253,7 @@ const SalesPage: React.FC = () => {
                     {paginatedSales.map(sale => (
                       <tr key={sale.id}>
                         <td className="px-4 py-3 font-medium">{sale.clienteNome}</td>
-                        <td className="px-4 py-3">{sale.produtoNome}</td>
+                        <td className="px-4 py-3">{sale.produtoNomes.join(", ")}</td>
                         <td className="px-4 py-3 flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="w-4 h-4" />
                           {new Date(sale.dataCriacao).toLocaleString("pt-BR")}

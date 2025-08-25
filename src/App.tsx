@@ -16,7 +16,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import SalesPage from "./pages/SalesPage"; // Import the new SalesPage
 import NotFound from "./pages/NotFound";
 import { Login } from "./pages/Login";
-import { RecuperarSenha } from "./pages/ResetPassword";
+import { RecuperarSenhaUnificado } from "./pages/ResetPassword";
 import { LandingPage } from "./pages/LandingPage";
 import { CustomerProvider } from "./contexts/CustomerContext";
 import { ProductProvider } from "./contexts/ProductContext";
@@ -55,7 +55,7 @@ const App = () => (
                         <Route path="/register" element={<Register />} />
                         <Route
                           path="/recuperar-senha"
-                          element={<RecuperarSenha />}
+                          element={<RecuperarSenhaUnificado />}
                         />
 
                         {/* 🔐 Rota de avaliação com query params */}

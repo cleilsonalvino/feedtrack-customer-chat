@@ -162,7 +162,7 @@ const addProduct = async (productData: NewProductData, showToast = true) => {
     
 
     
-    toast({ title: "Produto Desativado", description: `"${product.nome}" foi movido para os inativos.` });
+    toast({ title: "Produto Excluído Permanentemente", description: `"O produto "${product.nome}" foi excluído permanentemente!` });
   };
 
   return (

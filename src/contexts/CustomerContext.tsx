@@ -1,13 +1,21 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+} from "react";
 import api from "../lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
+// Interface for a single customer, now includes 'estado'
 export interface Customer {
   id: string;
   nome: string;
   email: string;
   telefone: string;
+  estado: string; // Added state field
   cidade: string;
   status: string;
   empresaId: string;
@@ -16,23 +24,29 @@ export interface Customer {
   dataExclusao?: string | null;
 }
 
+// Type for creating a new customer, now includes 'estado'
 export type NewCustomerData = {
   nome: string;
   email: string;
   telefone: string;
+  estado: string; // Added state field
   cidade: string;
 };
 
+// Defines the shape of the context
 interface CustomerContextType {
   customers: Customer[];
   loading: boolean;
   addCustomer: (data: NewCustomerData) => Promise<Customer | void>;
   updateCustomer: (customer: Omit<Customer, "produtos">) => Promise<void>;
-  deleteCustomer: (id: string) => Promise<void>;
+  inativeCustomer: (id: string) => Promise<void>;
   fetchCustomers: () => Promise<void>;
+  deleteCustomer: (id: string) => Promise<void>;
 }
 
-const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
+const CustomerContext = createContext<CustomerContextType | undefined>(
+  undefined
+);
 
 export const CustomerProvider = ({ children }: { children: ReactNode }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -40,6 +54,7 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  // Fetches all customers for the logged-in user's company
   const fetchCustomers = async () => {
     if (!user?.empresaId) {
       setCustomers([]);
@@ -62,12 +77,14 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Effect to fetch customers when the user's company ID is available
   useEffect(() => {
     if (user?.empresaId) {
       fetchCustomers();
     }
   }, [user?.empresaId]);
 
+  // Adds a new customer
   const addCustomer = async (data: NewCustomerData) => {
     if (!user?.empresaId) {
       toast({
@@ -92,10 +109,13 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateCustomer = async (updatedCustomer: Omit<Customer, "produtos">) => {
+  // Updates an existing customer's data
+  const updateCustomer = async (
+    updatedCustomer: Omit<Customer, "produtos">
+  ) => {
     try {
       await api.put(`/atualizar-cliente/${updatedCustomer.id}`, updatedCustomer);
-      await fetchCustomers();
+      await fetchCustomers(); // Refetch to get the latest data
     } catch (error) {
       toast({
         title: "Erro ao Atualizar",
@@ -106,25 +126,67 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const deleteCustomer = async (id: string) => {
+  // Deactivates a customer (soft delete)
+  const inativeCustomer = async (id: string) => {
     const customer = customers.find((c) => c.id === id);
     if (!customer) return;
     const deactivated = { ...customer, status: "INATIVO" };
     await updateCustomer(deactivated);
-    toast({ title: "Sucesso", description: `Cliente "${customer.nome}" foi desativado.` });
+    toast({
+      title: "Sucesso",
+      description: `Cliente "${customer.nome}" foi desativado.`,
+    });
+  };
+
+  // Permanently deletes a customer
+  const deleteCustomer = async (id: string) => {
+    const customer = customers.find((c) => c.id === id);
+    if (!customer) {
+      toast({
+        title: "Erro",
+        description: "Cliente não encontrado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await api.delete(`/deletar-cliente/${id}`);
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
+      toast({
+        title: "Sucesso",
+        description: `Cliente "${customer.nome}" foi deletado permanentemente.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao deletar",
+        description: error.message || "Não foi possível deletar o cliente.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
     <CustomerContext.Provider
-      value={{ customers, loading, addCustomer, updateCustomer, deleteCustomer, fetchCustomers }}
+      value={{
+        customers,
+        loading,
+        addCustomer,
+        updateCustomer,
+        deleteCustomer,
+        inativeCustomer,
+        fetchCustomers,
+      }}
     >
       {children}
     </CustomerContext.Provider>
   );
 };
 
+// Custom hook to use the CustomerContext
 export const useCustomer = () => {
   const context = useContext(CustomerContext);
-  if (!context) throw new Error("useCustomer must be used within CustomerProvider");
+  if (!context)
+    throw new Error("useCustomer must be used within CustomerProvider");
   return context;
 };

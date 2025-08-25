@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://server.feedtrack.site/api/v1", // ou sua URL de produção
+  baseURL: "http://localhost:3006/api/v1", // ou sua URL de produção
 });
 
 // Sempre que recarregar a página, adiciona o token do localStorage

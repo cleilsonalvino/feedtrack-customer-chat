@@ -151,38 +151,20 @@ export const ProductsPage = () => {
   const handleDeleteProduct = async (id: string) => {
     if (
       window.confirm(
-        "Tem certeza que deseja desativar este produto? Ele será movido para a lista de inativos."
+        "Tem certeza que deseja excluir permanentemente este produto? Essa ação não pode ser desfeita."
       )
     ) {
       await deleteProduct(id);
     }
   };
 
-  const handleReactivateProduct = async (product: Product) => {
-    const productToReactivate = {
-      ...product,
-      ativo: true,
-      dataExclusao: null,
-    };
-    await updateProduct(productToReactivate);
-    toast({
-      title: "Sucesso!",
-      description: `Produto "${product.nome}" foi reativado.`,
-    });
-  };
+
 
   return (
     <div className="p-4 md:p-8 space-y-6 m">
       <div className="flex justify-between items-center flex-wrap mt-10">
         <h1 className="text-3xl font-bold">Gestão de Produtos</h1>
         <div className="flex items-center gap-2 flex-wrap justify-center ">
-          <Button
-            variant="outline"
-            onClick={() => setIsInactiveModalOpen(true)}
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            Ver Inativos ({inactiveProducts.length})
-          </Button>
 
           {/* Botão para Adicionar em Lote */}
           <Button variant="outline" onClick={() => setIsBatchAddOpen(true)}>
@@ -372,67 +354,6 @@ export const ProductsPage = () => {
         </Dialog>
       )}
 
-      {/* Modal de Produtos Inativos */}
-      <Dialog open={isInactiveModalOpen} onOpenChange={setIsInactiveModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Produtos Inativos</DialogTitle>
-            <DialogDescription>
-              Lista de produtos que foram desativados. Você pode reativá-los a
-              qualquer momento.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-4 max-h-[400px] overflow-y-auto">
-            {inactiveProducts.length > 0 ? (
-              inactiveProducts.map((p) => (
-                <div
-                  key={p.id}
-                  className="p-3 border rounded-md flex justify-between items-center"
-                >
-                  <div>
-                    <p className="font-medium">{p.nome}</p>
-                    <p className="text-sm text-gray-500">
-                      Desativado em:{" "}
-                      {p.dataExclusao
-                        ? new Date(p.dataExclusao).toLocaleDateString("pt-BR")
-                        : "N/A"}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleReactivateProduct(p)}
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Reativar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleReactivateProduct(p)}
-                    className="bg-red-500 text-white"
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Excluir Permanentemente
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <p className="text-center text-gray-500 pt-10">
-                Nenhum produto inativo.
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsInactiveModalOpen(false)}
-            >
-              Fechar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* NOVO MODAL: Para Adicionar Produtos em Lote */}
       <Dialog open={isBatchAddOpen} onOpenChange={setIsBatchAddOpen}>

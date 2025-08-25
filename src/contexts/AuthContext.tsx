@@ -23,6 +23,8 @@ type User = {
   tipo: "USER" | "ADMIN" | "SUPER_ADMIN" | "EMPRESA";
   email?: string | null;
   status: "ATIVO" | "INATIVO";
+  tokenRecuperacao?: string
+  tokenRecuperacaoExpiracao?: string
   empresaId?: string | null;
   dataCriacao: string;
   dataAtualizacao: string;

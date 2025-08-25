@@ -42,12 +42,11 @@ import {
 
 // Definição de tipo para um usuário existente
 type User = {
-  id: number;
+  id: string;
   nomeUsuario: string;
-  email?: string;
-  tipo: string;
+  senhaHash: string;
+  tipo: "USER" | "ADMIN";
   status: "ATIVO" | "INATIVO";
-  lastLogin: string;
 };
 
 // Definição de tipo para um novo usuário a ser criado
@@ -73,13 +72,24 @@ export const SettingsPage = () => {
   const [feedbackDelay, setFeedbackDelay] = useState("24");
   const [users, setUsers] = useState<User[]>([]);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
-  const [newUser, setNewUser] = useState<NewUser>({
+  const [newUser, setNewUser] = useState<NewUser>({ 
     nomeUsuario: "",
     tipo: "USER",
     senhaHash: "",
     empresaId: user?.empresaId || "",
   });
   const [confirmText, setConfirmText] = useState("");
+  // States
+const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+const [userToEdit, setUserToEdit] = useState<{
+  id: string;
+  nomeUsuario: string;
+  senhaHash: string;
+  tipo: "USER" | "ADMIN";
+  email?: string;
+  status?: "ATIVO" | "INATIVO";
+} | null>(null);
+
 
   // --- EFEITOS ---
   useEffect(() => {
@@ -153,6 +163,16 @@ export const SettingsPage = () => {
       });
     }
   };
+
+  const updateUser = async (id: string, updatedUser: User) => {
+    try {
+      const response = await api.patch(`/atualizar-usuario/${id}`, updatedUser);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  };
+
 
   const handleDeleteCompany = async () => {
     console.log("user.empresaId:", user.empresaId);
@@ -250,7 +270,38 @@ export const SettingsPage = () => {
     }
   };
 
-  const handleDeleteUser = async (id: number) => {
+  const handleUpdateUser = async () => {
+  if (!userToEdit) return;
+
+  try {
+    // Exemplo de chamada à API para atualizar o usuário
+    await updateUser(userToEdit.id, {
+      nomeUsuario: userToEdit.nomeUsuario,
+      id: userToEdit.id,
+      status: userToEdit.status || "ATIVO", // Adicione um valor padrão ou trate como opcional
+      senhaHash: userToEdit.senhaHash,
+      tipo: userToEdit.tipo,
+    });
+
+    // Atualiza a lista localmente
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userToEdit.id ? { ...u, ...userToEdit } : u))
+    );
+    
+    setIsEditUserDialogOpen(false);
+    setUserToEdit(null);
+  } catch (err) {
+    console.error(err);
+    toast({
+      title: "Erro",
+      description: "Não foi possível atualizar o usuário",
+      variant: "destructive",
+    });
+  }
+};
+
+
+  const handleDeleteUser = async (id: string) => {
     if (!user?.empresaId) return;
     try {
       await api.delete(`/usuarios/${id}?empresaId=${user.empresaId}`);
@@ -284,6 +335,8 @@ export const SettingsPage = () => {
         return <Badge variant="outline">{role}</Badge>;
     }
   };
+
+  
 
   return (
     <div className="space-y-6 mt-16 p-4">
@@ -538,20 +591,19 @@ export const SettingsPage = () => {
                         {user.status === "ATIVO" ? "Ativo" : "Inativo"}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {user.email}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Último login:{" "}
-                      {user.lastLogin === "Nunca"
-                        ? "Nunca"
-                        : new Date(user.lastLogin).toLocaleDateString("pt-BR")}
-                    </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      <Edit className="w-3 h-3" />
-                    </Button>
+<Button
+  variant="outline"
+  size="sm"
+  onClick={() => {
+    setUserToEdit(user);
+    setIsEditUserDialogOpen(true);
+  }}
+>
+  <Edit className="w-3 h-3" />
+</Button>
+
                     {user.tipo !== "ADMIN" && (
                       <Button
                         variant="outline"
@@ -567,6 +619,78 @@ export const SettingsPage = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+{/* Modal de Edição de Usuário */}
+<Dialog
+  open={isEditUserDialogOpen}
+  onOpenChange={(open) => {
+    setIsEditUserDialogOpen(open);
+    if (!open) setUserToEdit(null); // limpa ao fechar
+  }}
+>
+  <DialogContent className="max-w-md">
+    <DialogHeader>
+      <DialogTitle>Editar Usuário</DialogTitle>
+    </DialogHeader>
+    {userToEdit && (
+      <div className="space-y-4 py-2">
+        <div>
+          <Label htmlFor="edit-username">Nome de Usuário</Label>
+          <Input
+            id="edit-username"
+            value={userToEdit.nomeUsuario}
+            onChange={(e) =>
+              setUserToEdit({ ...userToEdit, nomeUsuario: e.target.value })
+            }
+          />
+        </div>
+        <div>
+          <Label htmlFor="edit-password">Senha</Label>
+          <Input
+            id="edit-password"
+            type="password"
+            value={userToEdit.senhaHash}
+            onChange={(e) =>
+              setUserToEdit({ ...userToEdit, senhaHash: e.target.value })
+            }
+            placeholder="Deixe em branco para manter a senha atual"
+          />
+        </div>
+        <div>
+          <Label htmlFor="edit-role">Função</Label>
+          <Select
+            value={userToEdit.tipo}
+            onValueChange={(value: "USER" | "ADMIN") =>
+              setUserToEdit({ ...userToEdit, tipo: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="USER">USER</SelectItem>
+              <SelectItem value="ADMIN">ADMIN</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    )}
+    <DialogFooter className="flex gap-2">
+      <Button
+        variant="outline"
+        onClick={() => {
+          setIsEditUserDialogOpen(false);
+          setUserToEdit(null);
+        }}
+      >
+        Cancelar
+      </Button>
+      <Button onClick={handleUpdateUser}>Salvar Alterações</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+
 
         {/* Separador Notificações */}
         <TabsContent value="notifications" className="space-y-6">

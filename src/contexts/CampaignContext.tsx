@@ -63,10 +63,10 @@ export const CampaignProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  useEffect(() => {
-    console.log('CampaignContext: useEffect triggered');
-    fetchCampaigns();
-  }, [user?.empresaId]);
+useEffect(() => {
+  if (user?.empresaId) fetchCampaigns();
+}, [user?.empresaId]);
+
 
   const addCampaign = async (campaignData: NewCampaignData) => {
     if (!user?.empresaId) return;
@@ -97,26 +97,20 @@ const payload = { ...campaignData, empresaId };
     }
   };
 
-  const updateCampaign = async (campaignId: string, campaignData: Partial<NewCampaignData & { ativo: boolean }>) => {
-    if (!user?.empresaId) return;
-    const campaignToUpdate = campaigns.find(c => c.id === campaignId);
-    if (!campaignToUpdate) {
-      toast({ title: "Erro", description: "Campanha não encontrada para atualizar.", variant: "destructive" });
-      return;
-    }
+ const updateCampaign = async (
+  campaignId: string,
+  campaignData: Partial<NewCampaignData & { ativo?: boolean }>
+) => {
+  try {
+    await api.patch(`/atualizar-campanha/${campaignId}`, campaignData);
+    setCampaigns(current =>
+      current.map(c => (c.id === campaignId ? { ...c, ...campaignData } : c))
+    );
+  } catch (error) {
+    console.error("Erro ao atualizar campanha:", error);
+  }
+};
 
-
-    const updatedLocalCampaign = { ...campaignToUpdate, ...campaignData, empresaId: user.empresaId };
-
-    try {
-      await api.put(`/atualizar-campanha/${campaignId}`, updatedLocalCampaign);
-      setCampaigns(current => current.map(c => c.id === campaignId ? updatedLocalCampaign : c));
-      toast({ title: "Sucesso", description: "Campanha atualizada." });
-    } catch (error) {
-      console.error("Erro ao atualizar campanha:", error);
-      toast({ title: "Erro", description: "Não foi possível atualizar a campanha.", variant: "destructive" });
-    }
-  };
 
   const deleteCampaign = async (campaignId: string) => {
     try {

@@ -15,7 +15,7 @@ import { useProduct } from "../contexts/ProductContext";
 import { useAuth } from "../contexts/AuthContext";
 import api from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Clock, ChevronLeft, ChevronRight, X, Trash } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 // Interface atualizada para suportar múltiplos produtos
@@ -85,6 +85,18 @@ const SalesPage: React.FC = () => {
 
     fetchAndProcessSales();
   }, [user?.empresaId, toast, customers, products, loadingCustomers, loadingProducts]);
+
+  const deleteSale = (saleId: string) => async () => {
+    try {
+      await api.delete(`/venda/${saleId}/${user?.empresaId}`);
+      setSales(prev => prev.filter(sale => sale.id !== saleId));
+
+      toast({ title: "Sucesso!", description: "Venda excluída com sucesso." });
+    } catch (error) {
+      console.error("Erro ao excluir venda:", error);
+      toast({ title: "Erro", description: "Não foi possível excluir a venda.", variant: "destructive" });
+    }
+  };
 
   // --- LÓGICA DE FILTRAGEM E PAGINAÇÃO (com useMemo para performance) ---
   const filteredSales = useMemo(() => {
@@ -257,6 +269,11 @@ const SalesPage: React.FC = () => {
                         <td className="px-4 py-3 flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="w-4 h-4" />
                           {new Date(sale.dataCriacao).toLocaleString("pt-BR")}
+                        </td>
+                        <td>
+                          <Button onClick={deleteSale(sale.id)}  size="sm" className="hover:bg-muted-foreground/50 bg-red-600">
+                            <Trash className="w-4 h-4 " />
+                          </Button>
                         </td>
                       </tr>
                     ))}

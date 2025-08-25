@@ -66,6 +66,8 @@ const QuestionModal = ({
   const [texto, setTexto] = useState("");
   const [tipo, setTipo] = useState<"nota" | "texto" | "multipla_escolha">("nota");
   const isEditMode = !!questionToEdit;
+  const [isSaving, setIsSaving] = useState(false);
+
 
   // Popula o formulário com dados existentes se estiver em modo de edição
   useEffect(() => {
@@ -79,11 +81,17 @@ const QuestionModal = ({
     }
   }, [questionToEdit, isOpen]);
 
-  const handleSaveClick = () => {
-    if (!texto) return;
-    onSave({ texto, tipo }, questionToEdit?.id);
+const handleSaveClick = async () => {
+  if (!texto) return;
+  setIsSaving(true);
+  try {
+    await onSave({ texto, tipo }, questionToEdit?.id);
     onOpenChange(false); // Fecha o modal após salvar
-  };
+  } finally {
+    setIsSaving(false);
+  }
+};
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -122,9 +130,10 @@ const QuestionModal = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSaveClick}>
-            {isEditMode ? "Salvar Alterações" : "Criar Pergunta"}
+          <Button onClick={handleSaveClick} disabled={isSaving}>
+            {isSaving ? "Salvando..." : (isEditMode ? "Salvar Alterações" : "Criar Pergunta")}
           </Button>
+
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -142,10 +151,11 @@ const EditFormModal = ({
   onOpenChange: (open: boolean) => void;
 }) => {
   // Certifique-se de que `updateQuestion` e `addQuestion` estão disponíveis no seu hook
-  const { perguntas, updateForm, addQuestion, updateQuestion } = useForm();
+  const { perguntas, updateForm, addQuestion, updateQuestion, deleteQuestion } = useForm();
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false)
 
   // Estado para controlar o modal de pergunta
   const [questionModalState, setQuestionModalState] = useState<{
@@ -161,15 +171,21 @@ const EditFormModal = ({
     }
   }, [form]);
 
-  const handleUpdate = async () => {
-    if (!form) return;
+const handleUpdate = async () => {
+  if (!form) return;
+  setIsSaving(true);
+  try {
     await updateForm(form.id, {
       titulo,
       descricao,
       idsPerguntas: selectedQuestionIds,
     });
     onOpenChange(false);
-  };
+  } finally {
+    setIsSaving(false);
+  }
+};
+
 
   // Abre o modal para editar uma pergunta existente
   const handleEditQuestion = (questionId: string) => {
@@ -178,6 +194,11 @@ const EditFormModal = ({
       setQuestionModalState({ isOpen: true, questionToEdit: question });
     }
   };
+
+  const handleDeleteQuestion = (questionId: string) => {
+    deleteQuestion(questionId);
+  };
+
 
   // Abre o modal para criar uma nova pergunta
   const handleCreateQuestion = () => {
@@ -267,6 +288,10 @@ const EditFormModal = ({
                       className="cursor-pointer w-4 h-4 text-muted-foreground hover:text-primary"
                       onClick={() => handleEditQuestion(p.id)}
                     />
+                    <Trash2
+                      className="cursor-pointer w-4 h-4 text-red-500 hover:text-red-700"
+                      onClick={() => handleDeleteQuestion(p.id)}
+                    />
                   </div>
                 ))}
               </div>
@@ -276,7 +301,10 @@ const EditFormModal = ({
             <DialogClose asChild>
               <Button variant="outline">Cancelar</Button>
             </DialogClose>
-            <Button onClick={handleUpdate}>Salvar Alterações</Button>
+<Button onClick={handleUpdate} disabled={isSaving}>
+  {isSaving ? "Salvando..." : "Salvar Alterações"}
+</Button>
+
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -318,6 +346,8 @@ export const FormsPage = () => {
   // Estados para o modal de edição de formulário
   const [formToEdit, setFormToEdit] = useState<Formulario | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+
 
   // Estado para o modal de pergunta DENTRO do modal de criação de formulário
   const [createFormQuestionModal, setCreateFormQuestionModal] = useState<{
@@ -325,27 +355,35 @@ export const FormsPage = () => {
     questionToEdit: Pergunta | null;
   }>({ isOpen: false, questionToEdit: null });
 
-  const handleCreateForm = async () => {
-    if (!titulo || selectedQuestionIds.length === 0) {
-      toast({
-        title: "Erro de Validação",
-        description: "Título e ao menos uma pergunta são obrigatórios.",
-        variant: "destructive",
-      });
-      return;
-    }
+const handleCreateForm = async () => {
+  if (!titulo || selectedQuestionIds.length === 0) {
+    toast({
+      title: "Erro de Validação",
+      description: "Título e ao menos uma pergunta são obrigatórios.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setIsCreating(true); // ⬅️ ativa o loading
+
+  try {
     const newForm = await addForm({
       titulo,
       descricao,
       idsPerguntas: selectedQuestionIds,
     });
+
     if (newForm) {
       setTitulo("");
       setDescricao("");
       setSelectedQuestionIds([]);
       setIsCreateModalOpen(false);
     }
-  };
+  } finally {
+    setIsCreating(false); // ⬅️ desativa o loading
+  }
+};
 
   const handleDeleteQuestion = (questionId: string) => {
     deleteQuestion(questionId);
@@ -476,7 +514,8 @@ export const FormsPage = () => {
               >
                 Cancelar
               </Button>
-              <Button onClick={handleCreateForm}>Criar Formulário</Button>
+              <Button onClick={handleCreateForm} disabled={isCreating}>{isCreating ? "Criando..." : "Criar Formulário"}</Button>
+
             </DialogFooter>
              <QuestionModal
                 isOpen={createFormQuestionModal.isOpen}

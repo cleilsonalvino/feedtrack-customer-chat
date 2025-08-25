@@ -11,7 +11,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { CampaignResponseChart } from "@/components/CampaignResponseChart";
 import { FeedbackDistributionChart } from "@/components/FeedbackDistributionChart";
 import { SatisfactionTrendChart } from "@/components/SatisfactionTrendChart";
-import { FeedbackByCategoryChart } from "@/components/FeedbackByCategoryChart";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -58,9 +57,8 @@ const Index = () => {
             <CampaignResponseChart />
             <FeedbackDistributionChart />
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="">
             <SatisfactionTrendChart />
-            <FeedbackByCategoryChart />
           </div>
         </TabsContent>
 

@@ -199,7 +199,7 @@ export const CustomersPage = () => {
   const handleDeleteCustomer = async (id: string) => {
     // NOTE: window.confirm is generally discouraged in React for better UI control.
     // Consider implementing a custom confirmation dialog component.
-    if (window.confirm("Tem certeza que deseja desativar este cliente?")) {
+    if (window.confirm("Tem certeza que deseja excluir permanentemente este cliente?\nEsta ação não pode ser desfeita.\nTodas as vendas relacionadas a este cliente também serão excluídas.")) {
       await deleteCustomer(id);
     }
   };
@@ -553,43 +553,7 @@ export const CustomersPage = () => {
         </Dialog>
       )}
       
-      {/* Inactive Customers Modal */}
-      <Dialog open={isInactiveModalOpen} onOpenChange={setIsInactiveModalOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Clientes Inativos</DialogTitle>
-            <DialogDescription>
-              Lista de clientes que foram desativados. Você pode reativá-los ou excluí-los permanentemente.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 max-h-[60vh] overflow-y-auto">
-            <div className="space-y-3">
-              {inactiveCustomers.length > 0 ? (
-                inactiveCustomers.map((customer) => (
-                  <div key={customer.id} className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
-                    <div>
-                      <p className="font-medium">{customer.nome}</p>
-                      <p className="text-sm text-muted-foreground">{customer.email}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleReactivateCustomer(customer)}>
-                        <RotateCcw className="w-4 h-4 mr-2" />
-                        Reativar
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => deleteCustomer(customer.id)}>
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Excluir
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-muted-foreground py-8">Não há clientes inativos.</p>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+
 
     </div>
   );

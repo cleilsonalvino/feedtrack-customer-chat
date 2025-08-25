@@ -39,7 +39,6 @@ interface CustomerContextType {
   loading: boolean;
   addCustomer: (data: NewCustomerData) => Promise<Customer | void>;
   updateCustomer: (customer: Omit<Customer, "produtos">) => Promise<void>;
-  inativeCustomer: (id: string) => Promise<void>;
   fetchCustomers: () => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
 }
@@ -114,7 +113,7 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
     updatedCustomer: Omit<Customer, "produtos">
   ) => {
     try {
-      await api.put(`/atualizar-cliente/${updatedCustomer.id}`, updatedCustomer);
+     await api.put(`/atualizar-cliente/${updatedCustomer.id}/${user?.empresaId}`, updatedCustomer);
       await fetchCustomers(); // Refetch to get the latest data
     } catch (error) {
       toast({
@@ -126,17 +125,6 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Deactivates a customer (soft delete)
-  const inativeCustomer = async (id: string) => {
-    const customer = customers.find((c) => c.id === id);
-    if (!customer) return;
-    const deactivated = { ...customer, status: "INATIVO" };
-    await updateCustomer(deactivated);
-    toast({
-      title: "Sucesso",
-      description: `Cliente "${customer.nome}" foi desativado.`,
-    });
-  };
 
   // Permanently deletes a customer
   const deleteCustomer = async (id: string) => {
@@ -151,7 +139,7 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      await api.delete(`/deletar-cliente/${id}`);
+      await api.delete(`/deletar-cliente/${id}/${user?.empresaId}`,);
       setCustomers((prev) => prev.filter((c) => c.id !== id));
       toast({
         title: "Sucesso",
@@ -174,7 +162,6 @@ export const CustomerProvider = ({ children }: { children: ReactNode }) => {
         addCustomer,
         updateCustomer,
         deleteCustomer,
-        inativeCustomer,
         fetchCustomers,
       }}
     >

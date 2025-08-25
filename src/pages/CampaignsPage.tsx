@@ -726,7 +726,11 @@ export const CampaignsPage = () => {
                 <Label htmlFor="edit-template">Template da Mensagem *</Label>
                 <Textarea id="edit-template" value={editingCampaign.templateMensagem} onChange={(e) => setEditingCampaign({ ...editingCampaign, templateMensagem: e.target.value })} rows={8}/>
               </div>
+              
             </div>
+             <p className="text-sm text-muted-foreground p-2 bg-slate-50 rounded-md">
+              Use os placeholders <code className="text-orange-600">[Nome do Cliente]</code>, <code className="text-orange-600">[Nome do Produto]</code>, e <code className="text-orange-600">[Nome da Empresa]</code>.
+            </p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditingCampaign(null)}>Cancelar</Button>
               <Button onClick={handleUpdateCampaign}>Salvar Alterações</Button>

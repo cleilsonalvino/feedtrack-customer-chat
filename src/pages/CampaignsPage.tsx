@@ -388,6 +388,7 @@ const BulkSendModal = ({
         empresaId: user.empresaId,
         campanhaId: campaign.id,
       };
+      console.log("Payload para envio em massa:", payload);
       await api.post("/envio/massa", payload);
       toast({
         title: "Envio em Massa Iniciado!",
@@ -463,8 +464,8 @@ const BulkSendModal = ({
 // --- COMPONENTE PRINCIPAL DA PÁGINA ---
 
 const INITIAL_CAMPAIGN_STATE: Omit<NewCampaignData, "formularioId" | "empresaId"> = {
-    titulo: "",
-    descricao: "",
+    titulo: "Minha Primeira Campanha",
+    descricao: "Minha primeira campanha de feedback.",
     canalEnvio: "EMAIL",
     templateMensagem:
       "Olá [Nome do Cliente],\n\nEsperamos que você esteja aproveitando o [Nome do Produto].\nGostaríamos de saber: o produto atendeu às suas expectativas?\nSua avaliação nos ajuda a melhorar e oferecer sempre o melhor para você.\nPor favor, deixe seu feedback no link abaixo:\n\nAgradecemos pela sua confiança!\n\nAtenciosamente, \n[Nome da Empresa]",

@@ -339,8 +339,8 @@ export const FormsPage = () => {
 
   // Estados para o modal de criação de formulário
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [titulo, setTitulo] = useState("");
-  const [descricao, setDescricao] = useState("");
+  const [titulo, setTitulo] = useState("Meu primeiro Formulário");
+  const [descricao, setDescricao] = useState("Minha Primeira Descrição");
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
 
   // Estados para o modal de edição de formulário

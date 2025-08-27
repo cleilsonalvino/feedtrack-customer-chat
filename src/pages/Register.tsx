@@ -40,12 +40,12 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     setAlerta({
       tipo: "success",
-      mensagem: "Empresa cadastrada com sucesso! Redirecionando...",
+      mensagem: "Empresa cadastrada com sucesso! Redirecionando... Verifique seu Email!",
     });
 
     setTimeout(() => {
       navigate("/login", { replace: true });
-    }, 2000);
+    }, 3000);
   } catch (error: any) {
     setAlerta({
       tipo: "danger",

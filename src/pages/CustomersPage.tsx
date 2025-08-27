@@ -4,7 +4,12 @@ import {
   Customer,
   NewCustomerData,
 } from "../contexts/CustomerContext";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
@@ -51,13 +56,8 @@ interface IBGECityResponse {
 }
 
 export const CustomersPage = () => {
-  const {
-    customers,
-    addCustomer,
-    updateCustomer,
-    deleteCustomer,
-    loading,
-  } = useCustomer();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, loading } =
+    useCustomer();
   const { toast } = useToast();
 
   // UI state
@@ -65,6 +65,7 @@ export const CustomersPage = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isInactiveModalOpen, setIsInactiveModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
   // State for location data
   const [estados, setEstados] = useState<IBGEUFResponse[]>([]);
@@ -125,14 +126,13 @@ export const CustomersPage = () => {
     };
     fetchCidades();
   }, [selectedEstado, toast]);
-  
+
   // When opening the edit modal, set the selected state to fetch its cities
   useEffect(() => {
     if (editingCustomer?.estado) {
       setSelectedEstado(editingCustomer.estado);
     }
   }, [editingCustomer]);
-
 
   // Memoized separation of active and inactive customers
   const { activeCustomers, inactiveCustomers } = useMemo(() => {
@@ -159,39 +159,81 @@ export const CustomersPage = () => {
     [activeCustomers, searchTerm]
   );
 
-  // Handler to add a new customer
-  const handleAddCustomer = async () => {
-    if (!newCustomerData.nome || !newCustomerData.email) {
-      toast({
-        title: "Erro de Validação",
-        description: "Nome e email são obrigatórios.",
-        variant: "destructive",
-      });
-      return;
+  const validateCustomer = (customer: NewCustomerData | Customer) => {
+    const errors: { [key: string]: string } = {};
+
+    if (!customer.nome?.trim()) errors.nome = "Nome é obrigatório";
+    if (!customer.email?.trim()) errors.email = "Email é obrigatório";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email))
+      errors.email = "Email inválido";
+
+    if (customer.telefone) {
+      // Formato (XX) XXXX-XXXX ou (XX) XXXXX-XXXX
+      const telefoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
+      if (!telefoneRegex.test(customer.telefone)) {
+        errors.telefone =
+          "Telefone deve estar no formato (XX) XXXX-XXXX ou (XX) XXXXX-XXXX";
+      }
     }
-    const createdCustomer = await addCustomer(newCustomerData);
-    if (createdCustomer) {
-      setNewCustomerData({
-        nome: "",
-        email: "",
-        telefone: "",
-        estado: "",
-        cidade: "",
-      });
-      setSelectedEstado("");
-      setIsAddDialogOpen(false);
-    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
-  // Handler to save edits to an existing customer
+  // Recebe valor digitado e retorna formatado
+const formatPhone = (value: string) => {
+  // Remove tudo que não for número
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10)
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  // para números com 9 dígitos após o DDD
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
+};
+
+
+const handleAddCustomer = async () => {
+  if (!validateCustomer(newCustomerData)) return;
+
+  // Função para deixar o telefone "cru" (apenas números)
+  const getRawPhone = (phone: string) => phone.replace(/\D/g, "");
+
+  // Prepara os dados para envio
+  const customerToAdd = {
+    ...newCustomerData,
+    telefone: getRawPhone(newCustomerData.telefone),
+  };
+
+  // Adiciona o cliente
+  const createdCustomer = await addCustomer(customerToAdd);
+
+  if (createdCustomer) {
+    // Limpa formulário e estados
+    setNewCustomerData({
+      nome: "",
+      email: "",
+      telefone: "",
+      estado: "",
+      cidade: "",
+    });
+    setSelectedEstado("");
+    setFormErrors({});
+    setIsAddDialogOpen(false);
+  }
+};
+
   const handleSaveEdit = async () => {
-    if (!editingCustomer) return;
+    if (!editingCustomer || !validateCustomer(editingCustomer)) return;
+
     try {
       await updateCustomer(editingCustomer);
       setEditingCustomer(null);
+      setFormErrors({});
       toast({ title: "Sucesso!", description: "Cliente atualizado." });
     } catch (error) {
-      // Error is already handled in the context
+      // já tratado no context
     }
   };
 
@@ -199,11 +241,15 @@ export const CustomersPage = () => {
   const handleDeleteCustomer = async (id: string) => {
     // NOTE: window.confirm is generally discouraged in React for better UI control.
     // Consider implementing a custom confirmation dialog component.
-    if (window.confirm("Tem certeza que deseja excluir permanentemente este cliente?\nEsta ação não pode ser desfeita.\nTodas as vendas relacionadas a este cliente também serão excluídas.")) {
+    if (
+      window.confirm(
+        "Tem certeza que deseja excluir permanentemente este cliente?\nEsta ação não pode ser desfeita.\nTodas as vendas relacionadas a este cliente também serão excluídas."
+      )
+    ) {
       await deleteCustomer(id);
     }
   };
-  
+
   // Handler to reactivate an inactive customer
   const handleReactivateCustomer = async (customer: Customer) => {
     const customerToReactivate = { ...customer, status: "ATIVO" as const };
@@ -275,17 +321,26 @@ export const CustomersPage = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="telefone">Telefone</Label>
-                  <Input
-                    id="telefone"
-                    value={newCustomerData.telefone}
-                    onChange={(e) =>
-                      setNewCustomerData((prev) => ({
-                        ...prev,
-                        telefone: e.target.value,
-                      }))
-                    }
-                  />
+<Input
+  id="telefone"
+  value={newCustomerData.telefone}
+  onChange={(e) => {
+    const rawValue = e.target.value;
+    setNewCustomerData((prev) => ({
+      ...prev,
+      telefone: formatPhone(rawValue),
+    }));
+  }}
+  placeholder="(79) 9861-5536"
+/>
+
+                  {formErrors.telefone && (
+                    <p className="text-red-500 text-sm">
+                      {formErrors.telefone}
+                    </p>
+                  )}
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="estado">Estado</Label>
                   <Select
@@ -459,86 +514,86 @@ export const CustomersPage = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-               <div className="space-y-2">
-                  <Label>Nome</Label>
-                  <Input
-                    value={editingCustomer.nome}
-                    onChange={(e) =>
-                      setEditingCustomer((prev) =>
-                        prev ? { ...prev, nome: e.target.value } : null
-                      )
-                    }
-                  />
-                </div>
-                 <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={editingCustomer.email}
-                    onChange={(e) =>
-                      setEditingCustomer((prev) =>
-                        prev ? { ...prev, email: e.target.value } : null
-                      )
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Telefone</Label>
-                  <Input
-                    value={editingCustomer.telefone}
-                    onChange={(e) =>
-                      setEditingCustomer((prev) =>
-                        prev ? { ...prev, telefone: e.target.value } : null
-                      )
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Estado</Label>
-                   <Select
-                    value={editingCustomer.estado}
-                    onValueChange={(value) => {
-                      setSelectedEstado(value);
-                      setEditingCustomer((prev) =>
-                        prev ? { ...prev, estado: value, cidade: "" } : null
-                      );
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {estados.map((uf) => (
-                        <SelectItem key={uf.id} value={uf.sigla}>
-                          {uf.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Cidade</Label>
-                  <Select
-                    value={editingCustomer.cidade}
-                    onValueChange={(value) =>
-                      setEditingCustomer((prev) =>
-                        prev ? { ...prev, cidade: value } : null
-                      )
-                    }
-                    disabled={!editingCustomer.estado || cidades.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma cidade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cidades.map((city) => (
-                        <SelectItem key={city.id} value={city.nome}>
-                          {city.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label>Nome</Label>
+                <Input
+                  value={editingCustomer.nome}
+                  onChange={(e) =>
+                    setEditingCustomer((prev) =>
+                      prev ? { ...prev, nome: e.target.value } : null
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={editingCustomer.email}
+                  onChange={(e) =>
+                    setEditingCustomer((prev) =>
+                      prev ? { ...prev, email: e.target.value } : null
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone</Label>
+                <Input
+                  value={editingCustomer.telefone}
+                  onChange={(e) =>
+                    setEditingCustomer((prev) =>
+                      prev ? { ...prev, telefone: e.target.value } : null
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Estado</Label>
+                <Select
+                  value={editingCustomer.estado}
+                  onValueChange={(value) => {
+                    setSelectedEstado(value);
+                    setEditingCustomer((prev) =>
+                      prev ? { ...prev, estado: value, cidade: "" } : null
+                    );
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {estados.map((uf) => (
+                      <SelectItem key={uf.id} value={uf.sigla}>
+                        {uf.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Cidade</Label>
+                <Select
+                  value={editingCustomer.cidade}
+                  onValueChange={(value) =>
+                    setEditingCustomer((prev) =>
+                      prev ? { ...prev, cidade: value } : null
+                    )
+                  }
+                  disabled={!editingCustomer.estado || cidades.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma cidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cidades.map((city) => (
+                      <SelectItem key={city.id} value={city.nome}>
+                        {city.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <Button
@@ -552,9 +607,6 @@ export const CustomersPage = () => {
           </DialogContent>
         </Dialog>
       )}
-      
-
-
     </div>
   );
 };

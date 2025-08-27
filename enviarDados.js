@@ -1,5 +1,5 @@
 const url = "http://localhost:3006/api/v1/produto";
-const token = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjAxMDdlM2U4LWViNmUtNDg2YS04MTI4LTc5MmU3ZGM5NWQyZSIsIm5vbWVVc3VhcmlvIjoiYWRtaW5fY2xlaWxzb250ZWNoIiwidGlwbyI6IkFETUlOIiwiaWF0IjoxNzU2MDkzODIzLCJleHAiOjE3NTYwOTc0MjN9.sYiHlWjdgki8KkM6N6BtX4Vp1t4gXcW8ejrHLXDJvY4";
+const token = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjhhYTg0OTY0LWFlYjAtNGM1ZS05YzY5LWRjZjZhZTU3NTE2YyIsIm5vbWVVc3VhcmlvIjoiYWRtaW5fY2xlaWxzb250ZWNoIiwidGlwbyI6IkFETUlOIiwiaWF0IjoxNzU2MjY2MTQyLCJleHAiOjE3NTYyNjk3NDJ9.SPMUNeR1lrzsTN6trp6RSQ_MXaUhI_y7hzYXu_TfK0Y";
 
 const produtos = [
   { nome: "calça jeans", descricao: "Calça jeans azul clara", valor: 120 },
@@ -36,7 +36,7 @@ const produtos = [
         },
         body: JSON.stringify({
           ...p,
-          empresaId: "f14a7719-9a9c-49e8-9500-2b7209a240e7",
+          empresaId: "e6f99c59-94a1-409d-b095-8f709563cf1f",
         }),
       });
 

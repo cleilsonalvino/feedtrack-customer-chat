@@ -19,7 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogDescription,
 } from "../components/ui/dialog";
 import {
   Select,
@@ -29,50 +28,39 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Label } from "../components/ui/label";
-import {
-  Search,
-  Plus,
-  Edit,
-  Trash2,
-  Mail,
-  Phone,
-  MapPin,
-  Loader2,
-  Eye,
-  RotateCcw,
-} from "lucide-react";
 import { useToast } from "../hooks/use-toast";
+import { DialogDescription } from "@radix-ui/react-dialog";
+import { Edit, Loader2, Mail, MapPin, Phone, Plus, Search, Trash2 } from "lucide-react";
 
-// Define interfaces for the data from the IBGE API
-interface IBGEUFResponse {
-  id: number;
-  sigla: string;
-  nome: string;
-}
-
-interface IBGECityResponse {
-  id: number;
-  nome: string;
-}
+// Interfaces IBGE
+interface IBGEUFResponse { id: number; sigla: string; nome: string; }
+interface IBGECityResponse { id: number; nome: string; }
 
 export const CustomersPage = () => {
-  const { customers, addCustomer, updateCustomer, deleteCustomer, loading } =
-    useCustomer();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, loading } = useCustomer();
   const { toast } = useToast();
 
   // UI state
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isInactiveModalOpen, setIsInactiveModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
-  // State for location data
+  // IBGE state/city
   const [estados, setEstados] = useState<IBGEUFResponse[]>([]);
   const [cidades, setCidades] = useState<IBGECityResponse[]>([]);
   const [selectedEstado, setSelectedEstado] = useState("");
 
-  // State for the new customer form
+  const [editFormData, setEditFormData] = useState<NewCustomerData>({
+  nome: "",
+  email: "",
+  telefone: "",
+  estado: "",
+  cidade: "",
+});
+
+
+  // Form state
   const [newCustomerData, setNewCustomerData] = useState<NewCustomerData>({
     nome: "",
     email: "",
@@ -81,191 +69,121 @@ export const CustomersPage = () => {
     cidade: "",
   });
 
-  // Fetch all Brazilian states from the IBGE API on component mount
+  // Fetch estados
   useEffect(() => {
     const fetchEstados = async () => {
       try {
-        const response = await fetch(
-          "https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome"
-        );
-        const data = await response.json();
+        const res = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome");
+        const data = await res.json();
         setEstados(data);
       } catch (error) {
-        console.error("Failed to fetch states:", error);
-        toast({
-          title: "Erro de API",
-          description: "Não foi possível carregar a lista de estados.",
-          variant: "destructive",
-        });
+        toast({ title: "Erro de API", description: "Não foi possível carregar estados.", variant: "destructive" });
       }
     };
     fetchEstados();
   }, [toast]);
 
-  // Fetch cities for the selected state
+  // Fetch cidades
   useEffect(() => {
-    if (!selectedEstado) {
-      setCidades([]);
-      return;
-    }
+    if (!selectedEstado) { setCidades([]); return; }
     const fetchCidades = async () => {
       try {
-        const response = await fetch(
-          `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedEstado}/municipios`
-        );
-        const data = await response.json();
+        const res = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedEstado}/municipios`);
+        const data = await res.json();
         setCidades(data);
-      } catch (error) {
-        console.error("Failed to fetch cities:", error);
-        toast({
-          title: "Erro de API",
-          description: "Não foi possível carregar a lista de cidades.",
-          variant: "destructive",
-        });
+      } catch {
+        toast({ title: "Erro de API", description: "Não foi possível carregar cidades.", variant: "destructive" });
       }
     };
     fetchCidades();
   }, [selectedEstado, toast]);
 
-  // When opening the edit modal, set the selected state to fetch its cities
-  useEffect(() => {
-    if (editingCustomer?.estado) {
-      setSelectedEstado(editingCustomer.estado);
-    }
-  }, [editingCustomer]);
-
-  // Memoized separation of active and inactive customers
-  const { activeCustomers, inactiveCustomers } = useMemo(() => {
-    const active: Customer[] = [];
-    const inactive: Customer[] = [];
-    customers.forEach((c) => {
-      c.status === "ATIVO" ? active.push(c) : inactive.push(c);
+  // Prepara edição
+// Preenche o formulário de edição quando um cliente é selecionado
+useEffect(() => {
+  if (editingCustomer) {
+    setEditFormData({
+      nome: editingCustomer.nome || "",
+      email: editingCustomer.email || "",
+      telefone: formatPhone(editingCustomer.telefone || ""),
+      estado: editingCustomer.estado || "",
+      cidade: editingCustomer.cidade || "",
     });
-    return { activeCustomers: active, inactiveCustomers: inactive };
-  }, [customers]);
+    if (editingCustomer.estado) setSelectedEstado(editingCustomer.estado);
+  }
+}, [editingCustomer]);
 
-  // Memoized filtering of customers based on search term
-  const filteredCustomers = useMemo(
-    () =>
-      activeCustomers.filter(
-        (customer) =>
-          (customer.nome || "")
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          (customer.email || "")
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())
-      ),
-    [activeCustomers, searchTerm]
-  );
 
+  // Separação ativos/inativos
+  const activeCustomers = useMemo(() => customers.filter(c => c.status === "ATIVO"), [customers]);
+  const inactiveCustomers = useMemo(() => customers.filter(c => c.status !== "ATIVO"), [customers]);
+
+  // Filtragem por busca
+  const filteredCustomers = useMemo(() =>
+    activeCustomers.filter(c =>
+      (c.nome || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").includes(searchTerm.toLowerCase()) ||
+      (c.email || "").toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  , [activeCustomers, searchTerm]);
+
+  // Validação
   const validateCustomer = (customer: NewCustomerData | Customer) => {
     const errors: { [key: string]: string } = {};
-
     if (!customer.nome?.trim()) errors.nome = "Nome é obrigatório";
     if (!customer.email?.trim()) errors.email = "Email é obrigatório";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email))
-      errors.email = "Email inválido";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) errors.email = "Email inválido";
 
     if (customer.telefone) {
-      // Formato (XX) XXXX-XXXX ou (XX) XXXXX-XXXX
       const telefoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
-      if (!telefoneRegex.test(customer.telefone)) {
-        errors.telefone =
-          "Telefone deve estar no formato (XX) XXXX-XXXX ou (XX) XXXXX-XXXX";
-      }
+      if (!telefoneRegex.test(customer.telefone)) errors.telefone = "Telefone inválido";
     }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // Recebe valor digitado e retorna formatado
-const formatPhone = (value: string) => {
-  // Remove tudo que não for número
-  const digits = value.replace(/\D/g, "");
-
-  if (digits.length <= 2) return `(${digits}`;
-  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  if (digits.length <= 10)
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-  // para números com 9 dígitos após o DDD
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6, 10)}`;
-};
-
-
-const handleAddCustomer = async () => {
-  if (!validateCustomer(newCustomerData)) return;
-
-  // Função para deixar o telefone "cru" (apenas números)
-  const getRawPhone = (phone: string) => phone.replace(/\D/g, "");
-
-  // Prepara os dados para envio
-  const customerToAdd = {
-    ...newCustomerData,
-    telefone: getRawPhone(newCustomerData.telefone),
+  // Formata telefone
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length <= 2) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0,2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6,10)}`;
   };
 
-  // Adiciona o cliente
-  const createdCustomer = await addCustomer(customerToAdd);
-
-  if (createdCustomer) {
-    // Limpa formulário e estados
-    setNewCustomerData({
-      nome: "",
-      email: "",
-      telefone: "",
-      estado: "",
-      cidade: "",
-    });
-    setSelectedEstado("");
-    setFormErrors({});
-    setIsAddDialogOpen(false);
-  }
-};
-
-  const handleSaveEdit = async () => {
-    if (!editingCustomer || !validateCustomer(editingCustomer)) return;
-
-    try {
-      await updateCustomer(editingCustomer);
-      setEditingCustomer(null);
+  const handleAddCustomer = async () => {
+    if (!validateCustomer(newCustomerData)) return;
+    const customerToAdd = { ...newCustomerData, telefone: newCustomerData.telefone?.replace(/\D/g, "") };
+    const createdCustomer = await addCustomer(customerToAdd);
+    if (createdCustomer) {
+      setNewCustomerData({ nome:"", email:"", telefone:"", estado:"", cidade:"" });
+      setSelectedEstado("");
       setFormErrors({});
-      toast({ title: "Sucesso!", description: "Cliente atualizado." });
-    } catch (error) {
-      // já tratado no context
+      setIsAddDialogOpen(false);
     }
   };
 
-  // Handler to deactivate a customer
+const handleSaveEdit = async () => {
+  if (!editingCustomer || !validateCustomer(editFormData)) return;
+
+  const customerToUpdate = {
+    ...editingCustomer,
+    ...editFormData,
+    telefone: editFormData.telefone.replace(/\D/g, ""),
+  };
+
+  await updateCustomer(customerToUpdate);
+  setEditingCustomer(null);
+  setFormErrors({});
+  toast({ title: "Sucesso!", description: "Cliente atualizado." });
+};
+
   const handleDeleteCustomer = async (id: string) => {
-    // NOTE: window.confirm is generally discouraged in React for better UI control.
-    // Consider implementing a custom confirmation dialog component.
-    if (
-      window.confirm(
-        "Tem certeza que deseja excluir permanentemente este cliente?\nEsta ação não pode ser desfeita.\nTodas as vendas relacionadas a este cliente também serão excluídas."
-      )
-    ) {
+    if (window.confirm("Tem certeza que deseja excluir este cliente?")) {
       await deleteCustomer(id);
     }
   };
 
-  // Handler to reactivate an inactive customer
-  const handleReactivateCustomer = async (customer: Customer) => {
-    const customerToReactivate = { ...customer, status: "ATIVO" as const };
-    try {
-      await updateCustomer(customerToReactivate);
-      toast({
-        title: "Sucesso!",
-        description: `Cliente "${customer.nome}" foi reativado.`,
-      });
-      if (inactiveCustomers.length === 1) {
-        setIsInactiveModalOpen(false);
-      }
-    } catch (error) {
-      // Error is handled in the context
-    }
-  };
 
   return (
     <div className="p-4 md:p-8 space-y-6 mt-10">
@@ -500,113 +418,114 @@ const handleAddCustomer = async () => {
         </CardContent>
       </Card>
 
-      {/* Edit Customer Dialog */}
-      {editingCustomer && (
-        <Dialog
-          open={!!editingCustomer}
-          onOpenChange={() => setEditingCustomer(null)}
-        >
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Editar Cliente</DialogTitle>
-              <DialogDescription>
-                Altere os dados do cliente conforme necessário.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Nome</Label>
-                <Input
-                  value={editingCustomer.nome}
-                  onChange={(e) =>
-                    setEditingCustomer((prev) =>
-                      prev ? { ...prev, nome: e.target.value } : null
-                    )
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={editingCustomer.email}
-                  onChange={(e) =>
-                    setEditingCustomer((prev) =>
-                      prev ? { ...prev, email: e.target.value } : null
-                    )
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Telefone</Label>
-                <Input
-                  value={editingCustomer.telefone}
-                  onChange={(e) =>
-                    setEditingCustomer((prev) =>
-                      prev ? { ...prev, telefone: e.target.value } : null
-                    )
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Estado</Label>
-                <Select
-                  value={editingCustomer.estado}
-                  onValueChange={(value) => {
-                    setSelectedEstado(value);
-                    setEditingCustomer((prev) =>
-                      prev ? { ...prev, estado: value, cidade: "" } : null
-                    );
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {estados.map((uf) => (
-                      <SelectItem key={uf.id} value={uf.sigla}>
-                        {uf.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Cidade</Label>
-                <Select
-                  value={editingCustomer.cidade}
-                  onValueChange={(value) =>
-                    setEditingCustomer((prev) =>
-                      prev ? { ...prev, cidade: value } : null
-                    )
-                  }
-                  disabled={!editingCustomer.estado || cidades.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma cidade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cidades.map((city) => (
-                      <SelectItem key={city.id} value={city.nome}>
-                        {city.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setEditingCustomer(null)}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveEdit}>Guardar Alterações</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+{/* Edit Customer Dialog */}
+{editingCustomer && (
+  <Dialog
+    open={!!editingCustomer}
+    onOpenChange={(open) => !open && setEditingCustomer(null)}
+  >
+    <DialogContent className="max-w-2xl">
+      <DialogHeader>
+        <DialogTitle>Editar Cliente</DialogTitle>
+        <DialogDescription>
+          Altere os dados do cliente conforme necessário.
+        </DialogDescription>
+      </DialogHeader>
+
+      {/* Formulário de edição */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+        <div className="space-y-2">
+          <Label>Nome</Label>
+          <Input
+            value={editFormData.nome}
+            onChange={(e) =>
+              setEditFormData((prev) => ({ ...prev, nome: e.target.value }))
+            }
+          />
+          {formErrors.nome && <p className="text-red-500 text-sm">{formErrors.nome}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Email</Label>
+          <Input
+            type="email"
+            value={editFormData.email}
+            onChange={(e) =>
+              setEditFormData((prev) => ({ ...prev, email: e.target.value }))
+            }
+          />
+          {formErrors.email && <p className="text-red-500 text-sm">{formErrors.email}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Telefone</Label>
+          <Input
+            value={editFormData.telefone}
+            onChange={(e) =>
+              setEditFormData((prev) => ({
+                ...prev,
+                telefone: formatPhone(e.target.value),
+              }))
+            }
+          />
+          {formErrors.telefone && <p className="text-red-500 text-sm">{formErrors.telefone}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Estado</Label>
+          <Select
+            value={editFormData.estado}
+            onValueChange={(value) => {
+              setSelectedEstado(value);
+              setEditFormData((prev) => ({ ...prev, estado: value, cidade: "" }));
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione um estado" />
+            </SelectTrigger>
+            <SelectContent>
+              {estados.map((uf) => (
+                <SelectItem key={uf.id} value={uf.sigla}>
+                  {uf.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Cidade</Label>
+          <Select
+            value={editFormData.cidade}
+            onValueChange={(value) =>
+              setEditFormData((prev) => ({ ...prev, cidade: value }))
+            }
+            disabled={!editFormData.estado || cidades.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma cidade" />
+            </SelectTrigger>
+            <SelectContent>
+              {cidades.map((city) => (
+                <SelectItem key={city.id} value={city.nome}>
+                  {city.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Botões */}
+      <div className="flex justify-end gap-2 pt-4">
+        <Button variant="outline" onClick={() => setEditingCustomer(null)}>
+          Cancelar
+        </Button>
+        <Button onClick={handleSaveEdit}>Guardar Alterações</Button>
+      </div>
+    </DialogContent>
+  </Dialog>
+)}
     </div>
   );
 };

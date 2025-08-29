@@ -391,15 +391,6 @@ const [userToEdit, setUserToEdit] = useState<{
                     onChange={(e) => setCompanyEmail(e.target.value)}
                   />
                 </div>
-                                <div>
-                  <Label htmlFor="companyEmail">Email de Contacto</Label>
-                  <Input
-                    id="companyEmail"
-                    type="email"
-                    value={companyEmail}
-                    onChange={(e) => setCompanyEmail(e.target.value)}
-                  />
-                </div>
               </div>
             </CardContent>
           </Card>

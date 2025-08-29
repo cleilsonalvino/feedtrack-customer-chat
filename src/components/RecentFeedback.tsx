@@ -29,9 +29,7 @@ export const RecentFeedback = () => {
   // Verifica plano do usuário
   const dadosEmpresa = localStorage.getItem("userEmpresa");
   const empresa = dadosEmpresa ? JSON.parse(dadosEmpresa) : null;
-const isBasicPlan =
-  empresa?.props?.plano === "BASIC" || empresa?.props?.plano === "FREE";
-
+  const isBasicPlan = empresa?.props?.plano === "FREE";
 
   useEffect(() => {
     if (!user?.empresaId) return;

@@ -361,9 +361,6 @@ const [userToEdit, setUserToEdit] = useState<{
           <TabsTrigger value="users">
             <Users className="w-4 h-4 mr-2" /> Utilizadores
           </TabsTrigger>
-          <TabsTrigger value="notifications">
-            <Bell className="w-4 h-4 mr-2" /> Notificações
-          </TabsTrigger>
         </TabsList>
 
         {/* Separador Geral */}

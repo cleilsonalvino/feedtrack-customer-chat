@@ -12,7 +12,6 @@ import { CampaignResponseChart } from "@/components/CampaignResponseChart";
 import { FeedbackDistributionChart } from "@/components/FeedbackDistributionChart";
 import { SatisfactionTrendChart } from "@/components/SatisfactionTrendChart";
 import { FeedbackPerProductChart } from "@/components/FeedbackPerProductChart";
-import { FeedbackPerEmployeeChart } from "@/components/FeedbackPerEmployeeChart";
 import { AverageRatingPerProductChart } from "@/components/AverageRatingPerProductChart";
 import { KeywordsInFeedbackChart } from "@/components/KeywordsInFeedbackChart";
 import { useEffect, useState } from "react";
@@ -75,9 +74,8 @@ const Index = () => {
         </TabsContent>
 
         <TabsContent value="more-charts" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="gap-6">
             <FeedbackPerProductChart />
-            <FeedbackPerEmployeeChart />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <AverageRatingPerProductChart />

@@ -48,7 +48,9 @@ export const FeedbackPerEmployeeChart = () => {
       <CardHeader>
         <CardTitle>Feedbacks por Funcionário</CardTitle>
       </CardHeader>
+      
       <CardContent className='blur'>
+        
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />

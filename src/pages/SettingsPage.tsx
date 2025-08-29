@@ -391,45 +391,15 @@ const [userToEdit, setUserToEdit] = useState<{
                     onChange={(e) => setCompanyEmail(e.target.value)}
                   />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Configurações de Feedback</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 blur">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Envio Automático de Feedback</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Enviar automaticamente pedidos de feedback após compras
-                  </p>
+                                <div>
+                  <Label htmlFor="companyEmail">Email de Contacto</Label>
+                  <Input
+                    id="companyEmail"
+                    type="email"
+                    value={companyEmail}
+                    onChange={(e) => setCompanyEmail(e.target.value)}
+                  />
                 </div>
-                <Switch
-                  checked={autoSendFeedback}
-                  onCheckedChange={setAutoSendFeedback}
-                />
-              </div>
-              <div>
-                <Label>Atraso para Envio (horas)</Label>
-                <Select
-                  value={feedbackDelay}
-                  onValueChange={setFeedbackDelay}
-                  disabled={true}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 hora</SelectItem>
-                    <SelectItem value="6">6 horas</SelectItem>
-                    <SelectItem value="24">24 horas</SelectItem>
-                    <SelectItem value="48">48 horas</SelectItem>
-                    <SelectItem value="72">72 horas</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </CardContent>
           </Card>

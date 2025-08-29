@@ -80,32 +80,54 @@ export const SatisfactionTrendChart = () => {
   if (loading) return <div className="text-center p-4">Carregando tendência de satisfação...</div>;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="w-5 h-5" /> Tendência de Satisfação
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart
-            data={data}
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="satisfactionScore"
-              stroke="#82ca9d"
-              activeDot={{ r: 8 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
+<Card>
+  <CardHeader>
+    <CardTitle className="flex items-center gap-2">
+      <TrendingUp className="w-5 h-5" /> Tendência de Satisfação
+    </CardTitle>
+  </CardHeader>
+  <CardContent className="relative">
+    {(() => {
+      const empresa = JSON.parse(localStorage.getItem("userEmpresa") || "{}");
+      const isBasicPlan = empresa?.props?.plano ===  "FREE";
+
+      return (
+        <>
+          {/* Gráfico com blur se for plano BASIC */}
+          <div className={`rounded-lg overflow-hidden transition-all duration-300 ${isBasicPlan ? "blur-sm" : ""}`}>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart
+                data={data}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="satisfactionScore"
+                  stroke="#82ca9d"
+                  activeDot={{ r: 8 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Overlay informando acesso restrito para plano BASIC */}
+          {isBasicPlan && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg pointer-events-none z-10 text-center px-4">
+              <span className="text-white font-semibold">
+                Gráfico Disponível a partir do plano BASIC
+              </span>
+            </div>
+          )}
+        </>
+      );
+    })()}
+  </CardContent>
+</Card>
+
   );
 };

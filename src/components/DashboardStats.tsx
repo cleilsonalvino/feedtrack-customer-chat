@@ -13,27 +13,64 @@ interface Feedback {
   _funcionarioNome: string;
 }
 
+interface DashboardData {
+  totalFeedbacks: number;
+  averageRating: number | string;
+  clientesAtivos: number;
+  taxaResposta: string;
+}
+
 export const DashboardStats = () => {
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    totalFeedbacks: 0,
+    averageRating: 0,
+    clientesAtivos: 0,
+    taxaResposta: "0%",
+  });
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchFeedbacks = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
 
-        // Pegar empresa do localStorage
         const user = JSON.parse(localStorage.getItem("user") || "{}");
         if (!user.empresaId) throw new Error("Empresa não encontrada");
 
-        const response = await api.get(`/feedbacks/empresa/${user.empresaId}`);
-        setFeedbacks(response.data);
+        // Buscar todos os envios e feedbacks
+        const [enviosRes, feedbacksRes] = await Promise.all([
+          api.get(`/envios/${user.empresaId}`),
+          api.get(`/feedbacks/empresa/${user.empresaId}`)
+        ]);
+
+        const envios = enviosRes.data;
+        const feedbacks = feedbacksRes.data;
+
+        const totalEnvios = envios.length;
+        const respostasRecebidas = feedbacks.length;
+
+        const totalFeedbacks = feedbacks.length;
+        const averageRating = totalFeedbacks > 0
+          ? (feedbacks.reduce((sum: number, fb: Feedback) => {
+              const nota = fb._respostas.find(r => r.tipo === "nota")?.nota ?? 0;
+              return sum + nota;
+            }, 0) / totalFeedbacks).toFixed(1)
+          : 0;
+
+        const clientesAtivos = new Set(feedbacks.map(fb => fb._clienteNome)).size;
+
+        const taxaResposta = totalEnvios > 0
+          ? `${Math.round((respostasRecebidas / totalEnvios) * 100)}%`
+          : "0%";
+
+        setDashboardData({ totalFeedbacks, averageRating, clientesAtivos, taxaResposta });
+
       } catch (err) {
         console.error(err);
         toast({
           title: "Erro ao carregar dados",
-          description: "Não foi possível buscar os feedbacks",
+          description: "Não foi possível buscar os dados do dashboard",
           variant: "destructive",
         });
       } finally {
@@ -41,27 +78,14 @@ export const DashboardStats = () => {
       }
     };
 
-    fetchFeedbacks();
+    fetchData();
   }, [toast]);
 
-  // Cálculos simples
-  const totalFeedbacks = feedbacks.length;
-  const averageRating =
-    feedbacks.length > 0
-      ? (feedbacks.reduce((sum, fb) => {
-          const nota = fb._respostas.find(r => r.tipo === "nota")?.nota ?? 0;
-          return sum + nota;
-        }, 0) / feedbacks.length).toFixed(1)
-      : 0;
-
-  const clientesAtivos = new Set(feedbacks.map(fb => fb._clienteNome)).size;
-  const taxaResposta = totalFeedbacks > 0 ? `${Math.round((totalFeedbacks / clientesAtivos) * 100)}%` : "0%";
-
   const stats = [
-    { title: "Total de Avaliações", value: totalFeedbacks, icon: MessageSquare, color: "text-primary" },
-    { title: "Nota Média", value: averageRating, icon: Star, color: "text-warning" },
-    { title: "Clientes Ativos", value: clientesAtivos, icon: Users, color: "text-success" },
-    { title: "Taxa de Resposta", value: taxaResposta, icon: TrendingUp, color: "text-primary" },
+    { title: "Total de Avaliações", value: dashboardData.totalFeedbacks, icon: MessageSquare, color: "text-primary" },
+    { title: "Nota Média", value: dashboardData.averageRating, icon: Star, color: "text-warning" },
+    { title: "Clientes Ativos", value: dashboardData.clientesAtivos, icon: Users, color: "text-success" },
+    { title: "Taxa de Resposta", value: dashboardData.taxaResposta, icon: TrendingUp, color: "text-primary" },
   ];
 
   if (isLoading) return <div className="min-h-[200px] flex justify-center items-center">Carregando...</div>;

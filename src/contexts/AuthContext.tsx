@@ -13,6 +13,7 @@ type UserEmpresa = {
     nome: string;
     cnpj?: string;
     email?: string;
+    plano?: string;
   };
 };
 

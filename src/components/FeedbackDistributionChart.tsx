@@ -65,34 +65,57 @@ export const FeedbackDistributionChart = () => {
   if (loading) return <div className="text-center p-4">Carregando distribuição de avaliações...</div>;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Star className="w-5 h-5" /> Distribuição de Avaliações
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              outerRadius={80}
-              fill="#8884d8"
-              dataKey="value"
-              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip />
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
+<Card>
+  <CardHeader>
+    <CardTitle className="flex items-center gap-2">
+      <Star className="w-5 h-5" /> Distribuição de Avaliações
+    </CardTitle>
+  </CardHeader>
+  <CardContent className="relative">
+    {(() => {
+      const empresa = JSON.parse(localStorage.getItem("userEmpresa") || "{}");
+      const isBasicPlan = empresa?.props?.plano === "FREE";
+
+
+      return (
+        <>
+          {/* Gráfico com blur se for plano BASIC */}
+          <div className={`rounded-lg overflow-hidden transition-all duration-300 ${isBasicPlan ? "blur-sm" : ""}`}>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={data}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                >
+                  {data.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Overlay informando acesso restrito para plano BASIC */}
+          {isBasicPlan && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg pointer-events-none z-10 text-center px-4">
+              <span className="text-white font-semibold">
+                Gráfico Disponível a partir do plano BASIC
+              </span>
+            </div>
+          )}
+        </>
+      );
+    })()}
+  </CardContent>
+</Card>
+
   );
 };

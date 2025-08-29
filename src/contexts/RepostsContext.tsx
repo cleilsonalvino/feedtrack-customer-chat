@@ -138,7 +138,7 @@ export const ReportsProvider = ({ children, allFeedbacks }: ReportsProviderProps
       negative: totalFeedbacks > 0 ? Math.round((negativeCount / totalFeedbacks) * 100) : 0,
     };
 
-    // Calcula os produtos mais avaliados
+    // Calcula os produtosa mais avaliados
     const productGroups = filteredFeedbacks.reduce((acc, fb) => {
       acc[fb._produtoNome] = acc[fb._produtoNome] || {
         name: fb._produtoNome,

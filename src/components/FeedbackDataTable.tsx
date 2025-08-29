@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Trash2 } from 'lucide-react';
 import ReactPaginate from 'react-paginate';
 import { useDebounce } from '@/hooks/use-debounce';
+import { Star, StarHalf, Star as StarOutline } from "lucide-react"
 
 interface Feedback {
   _id: string;
@@ -38,6 +39,7 @@ export const FeedbackDataTable = () => {
       try {
         const response = await api.get(`/feedbacks/empresa/${user.empresaId}`);
         setFeedbacks(response.data);
+        console.log(response.data)
       } catch (err) {
         setError('Não foi possível carregar os feedbacks.');
       } finally {
@@ -93,6 +95,8 @@ export const FeedbackDataTable = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Cliente</TableHead>
+              <TableHead>Resposta</TableHead>
+              <TableHead>Avaliacao</TableHead>
               <TableHead>Produto</TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Ações</TableHead>
@@ -102,6 +106,33 @@ export const FeedbackDataTable = () => {
             {currentPageData.map(feedback => (
               <TableRow key={feedback._id}>
                 <TableCell>{feedback._clienteNome}</TableCell>
+ <TableCell>
+    {feedback._respostas
+      .filter(r => r.tipo === "texto")
+      .map((r, idx) => (
+        <p key={idx}>{r.resposta_texto}</p>
+      ))
+    }
+  </TableCell>
+
+  {/* Notas */}
+<TableCell className="flex gap-1">
+  {feedback._respostas
+    .filter(r => r.tipo === "nota")
+    .map((r, idx) => {
+      const stars = [];
+      for (let i = 1; i <= 5; i++) {
+        if (i <= r.nota!) {
+          stars.push(<Star key={i} className="w-4 h-4 text-yellow-400" /> );
+        } else {
+          stars.push(<StarOutline key={i} className="w-4 h-4 text-gray-300" />);
+        }
+      }
+      return <div key={idx} className="flex">{stars}</div>;
+    })
+  }
+</TableCell>
+                <TableCell></TableCell>
                 <TableCell>{feedback._produtoNome}</TableCell>
                 <TableCell>{new Date(feedback._dataCriacao).toLocaleDateString()}</TableCell>
                 <TableCell>

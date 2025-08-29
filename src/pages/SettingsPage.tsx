@@ -660,42 +660,6 @@ const [userToEdit, setUserToEdit] = useState<{
 
 
 
-        {/* Separador Notificações */}
-        <TabsContent value="notifications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Preferências de Notificação</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 blur">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Notificações por Email</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receber alertas sobre novas avaliações e relatórios
-                  </p>
-                </div>
-                <Switch
-                  checked={emailNotifications}
-                  onCheckedChange={setEmailNotifications}
-                  disabled={true}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Notificações Push</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receber notificações em tempo real no navegador
-                  </p>
-                </div>
-                <Switch
-                  checked={pushNotifications}
-                  onCheckedChange={setPushNotifications}
-                  disabled={true}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );

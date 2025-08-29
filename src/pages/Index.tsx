@@ -34,7 +34,7 @@ const Index = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mt-10">Dashboard {nomeEmpresa}</h1>
+        <h1 className="text-3xl font-bold mt-16">Dashboard {nomeEmpresa}</h1>
         <p className="text-muted-foreground">
           Acompanhe as métricas de satisfação dos seus clientes em tempo real.
         </p>

@@ -1,5 +1,3 @@
-// src/contexts/AuthContext.jsx
-
 import React, {
   createContext,
   useContext,
@@ -7,23 +5,45 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
+import api from "@/lib/api";
 
-// Tipos (sem alterações)
-type User = {
-  username: string;
-  role: "admin" | "funcionario" | "master";
-  name: string;
+type UserEmpresa = {
+  id: string;
+  props: {
+    nome: string;
+    cnpj?: string;
+    email?: string;
+    plano?: string;
+  };
 };
 
-// ... (o resto dos seus tipos não precisa de alteração)
+type User = {
+  id: string;
+  nomeUsuario: string;
+  senhaHash: string;
+  tipo: "USER" | "ADMIN" | "SUPER_ADMIN" | "EMPRESA";
+  email?: string | null;
+  status: "ATIVO" | "INATIVO";
+  tokenRecuperacao?: string
+  tokenRecuperacaoExpiracao?: string
+  empresaId?: string | null;
+  dataCriacao: string;
+  dataAtualizacao: string;
+  dataExclusao?: string | null;
+};
+
 type AuthContextType = {
   user: User | null;
+  userEmpresa: UserEmpresa | null;
   isAuthenticated: boolean;
   loading: boolean;
-  isAdmin: boolean;
-  isEmployee: boolean;
-  isMaster: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (nomeUsuario: string, senha: string) => Promise<User>;
+  register: (data: {
+    nome: string;
+    cnpj?: string;
+    email: string;
+    plano: string;
+  }) => Promise<void>;
   logout: () => void;
 };
 
@@ -33,80 +53,95 @@ type AuthProviderProps = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-
-// --- INÍCIO DA SIMULAÇÃO DE API ---
-
-// 1. Base de dados simulada (nosso objeto JSON)
-const mockUsers = [
-  {
-    username: "admin",
-    password: "admin123",
-    role: "admin", // Com 'as const', TypeScript entende isto como o tipo "admin" e não "string"
-    name: "Administrador do Sistema",
-  },
-  {
-    username: "funcionario",
-    password: "func123",
-    role: "funcionario",
-    name: "Colaborador Padrão",
-  },
-  {
-    username: "master",
-    password: "master123",
-    role: "master",
-    name: "Super Usuário",
-  },
-] as const; // A MUDANÇA ESTÁ AQUI 🚀
-
-// ... (o resto do ficheiro permanece exatamente igual)
-
-// 2. Função que simula a chamada à API
-const mockApiLogin = (username: string, password: string): Promise<{ user: User, token: string }> => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const foundUser = mockUsers.find(
-        (user) => user.username === username && user.password === password
-      );
-
-      if (foundUser) {
-        const { password, ...userToReturn } = foundUser;
-        resolve({
-          user: userToReturn, // Agora 'userToReturn' tem o tipo correto para 'role'
-          token: `mock-jwt-token-for-${username}`,
-        });
-      } else {
-        reject(new Error("Credenciais inválidas"));
-      }
-    }, 500);
-  });
-};
-
-// --- FIM DA SIMULAÇÃO DE API ---
-
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  // ... (Nenhuma alteração necessária aqui)
   const [user, setUser] = useState<User | null>(() => {
     const storedUser = localStorage.getItem("user");
     return storedUser ? JSON.parse(storedUser) : null;
   });
+
+  const [userEmpresa, setUserEmpresa] = useState<UserEmpresa | null>(() => {
+    const storedEmpresa = localStorage.getItem("userEmpresa");
+    return storedEmpresa ? JSON.parse(storedEmpresa) : null;
+  });
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(false);
   }, []);
 
-  const login = async (username: string, password: string) => {
-    const data = await mockApiLogin(username, password);
-    const loggedUser: User = data.user;
-    const token: string = data.token;
-    localStorage.setItem("user", JSON.stringify(loggedUser));
+const login = async (nomeUsuario: string, senha: string) => {
+  try {
+    const response = await api.post("/login", { nomeUsuario, senha });
+
+    const { token, usuario } = response.data; // token do backend
+
+    // SALVA O USER
+    setUser(usuario);
+    localStorage.setItem("user", JSON.stringify(usuario));
+
+    // SALVA O TOKEN
     localStorage.setItem("authToken", token);
-    setUser(loggedUser);
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+    if (usuario.empresaId) {
+      const empresaRes = await api.get(`/empresa/${usuario.empresaId}`);
+      const empresa: UserEmpresa = empresaRes.data;
+      setUserEmpresa(empresa);
+      localStorage.setItem("userEmpresa", JSON.stringify(empresa));
+    } else {
+      setUserEmpresa(null);
+      localStorage.removeItem("userEmpresa");
+    }
+
+    return usuario;
+  } catch (error: any) {
+    throw new Error(
+      "Falha no login: " + (error.response?.data?.message || error.message)
+    );
+  }
+};
+
+  const register = async (data: {
+    nome: string;
+    cnpj?: string;
+    email: string;
+    plano: string;
+  }) => {
+    try {
+      const payload = {
+        nome: data.nome,
+        cnpj: data.cnpj?.trim() ? data.cnpj : undefined,
+        email: data.email,
+        plano: data.plano,
+      };
+
+      /**
+       * Esperando:
+       * {
+       *  empresa: {...},
+       *  usuario: {...}
+       * }
+       */
+      const response = await api.post("/empresa", payload);
+      const { empresa, usuario } = response.data;
+
+      localStorage.setItem("userEmpresa", JSON.stringify(empresa));
+      setUserEmpresa(empresa);
+
+      localStorage.setItem("user", JSON.stringify(usuario));
+      setUser(usuario);
+    } catch (error: any) {
+      throw new Error(
+        "Falha no cadastro: Nome ou Email já existem no sistema")
+    }
   };
 
   const logout = () => {
     setUser(null);
+    setUserEmpresa(null);
     localStorage.removeItem("user");
+    localStorage.removeItem("userEmpresa");
     localStorage.removeItem("authToken");
   };
 
@@ -114,12 +149,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     <AuthContext.Provider
       value={{
         user,
+        userEmpresa,
         isAuthenticated: !!user,
         loading,
-        isAdmin: user?.role === "admin",
-        isEmployee: user?.role === "funcionario",
-        isMaster: user?.role === "master",
         login,
+        register,
         logout,
       }}
     >
@@ -128,12 +162,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   );
 };
 
-
 export const useAuth = (): AuthContextType => {
-  // ... (Nenhuma alteração necessária aqui)
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };

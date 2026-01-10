@@ -1,126 +1,158 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import api from "../lib/api"; 
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
+// --- TIPOS ---
 export type FeedbackApiResponse = {
-    id: string;
-    formularioId: string;
-    envioId: string;
-    respostas: { perguntaId: string; resposta: any }[];
-    dataCriacao: string;
-    dataExclusao?: string | null;
+  id: string;
+  formularioId: string;
+  envioId: string;
+  respostas: { perguntaId: string; resposta: any }[];
+  empresaId: string;
+  dataCriacao: string;
+  dataExclusao?: string | null;
 };
 
-export type FeedbackApiRequest = {
-    formularioId: string;
-    envioId: string;
-    respostas: { perguntaId: string; resposta: any }[];
+export type DynamicFeedbackPayload = {
+  clienteNome: string;
+  produtoNome: string;
+  respostas: {
+    perguntaId: string;
+    tipo: "texto" | "nota" | "multipla_escolha";
+    resposta_texto?: string;
+    nota?: number;
+  }[];
 };
 
+// --- FORMULÁRIOS ---
+export type IFormulario = {
+  id: string;
+  titulo: string;
+  descricao?: string;
+  ativo: boolean;
+  perguntas: {
+    _id: string;
+    _texto: string;
+    _tipo: "texto" | "nota" | "multipla_escolha";
+    _opcoes?: string[];
+    obrigatoria: boolean;
+  }[];
+  dataCriacao: string;
+  dataAtualizacao: string;
+  dataExclusao?: string | null;
+};
+
+export type Usuario = { id: string; nomeUsuario: string; };
+
+// --- CONTEXTO ---
 type FeedBackContextType = {
-    feedbacks: FeedbackApiResponse[];
-    fetchFeedbacks: () => Promise<void>;
-    getFeedbackByEnvioId: (envioId: string) => Promise<FeedbackApiResponse | null>;
-    createFeedback: (data: FeedbackApiRequest) => Promise<FeedbackApiResponse | null>;
-    deleteFeedback: (id: string) => Promise<boolean>;
-    loading: boolean;
-    error: string | null;
+  feedbacks: FeedbackApiResponse[];
+  fetchFeedbacks: () => Promise<void>;
+  submitDynamicFeedback: (data: DynamicFeedbackPayload) => Promise<FeedbackApiResponse | null>;
+  deleteFeedback: (id: string) => Promise<boolean>;
+  formularios: IFormulario[];
+  fetchFormularios: () => Promise<void>;
+  loading: boolean;
+  error: string | null;
 };
 
 const FeedBackContext = createContext<FeedBackContextType | undefined>(undefined);
 
 export const useFeedBack = () => {
-    const ctx = useContext(FeedBackContext);
-    if (!ctx) throw new Error("useFeedBack must be used within FeedBackProvider");
-    return ctx;
+  const ctx = useContext(FeedBackContext);
+  if (!ctx) throw new Error("useFeedBack must be used within FeedBackProvider");
+  return ctx;
 };
 
 export const FeedBackProvider = ({ children }: { children: ReactNode }) => {
-    const [feedbacks, setFeedbacks] = useState<FeedbackApiResponse[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth(); // pega empresaId do usuário logado
+  const { toast } = useToast();
 
-    const fetchFeedbacks = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const res = await fetch("/feedbacks");
-            if (!res.ok) throw new Error("Erro ao buscar feedbacks");
-            const data = await res.json();
-            setFeedbacks(data);
-        } catch (err: any) {
-            setError(err.message || "Erro desconhecido");
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+  const [feedbacks, setFeedbacks] = useState<FeedbackApiResponse[]>([]);
+  const [formularios, setFormularios] = useState<IFormulario[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const getFeedbackByEnvioId = useCallback(async (envioId: string) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const res = await fetch(`/feedback/${envioId}`);
-            if (res.status === 404) return null;
-            if (!res.ok) throw new Error("Erro ao buscar feedback");
-            const data = await res.json();
-            return data as FeedbackApiResponse;
-        } catch (err: any) {
-            setError(err.message || "Erro desconhecido");
-            return null;
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+  const fetchFeedbacks = useCallback(async () => {
+    if (!user?.empresaId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get<FeedbackApiResponse[]>(`/feedbacks/empresa/empresaId=${user.empresaId}`);
+      setFeedbacks(data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || "Erro ao buscar feedbacks");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.empresaId]);
 
-    const createFeedback = useCallback(async (data: FeedbackApiRequest) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const res = await fetch("/feedback", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-            });
-            if (res.status === 400) throw new Error("Dados inválidos");
-            if (!res.ok) throw new Error("Erro ao criar feedback");
-            const created = await res.json();
-            setFeedbacks((prev) => [created, ...prev]);
-            return created as FeedbackApiResponse;
-        } catch (err: any) {
-            setError(err.message || "Erro desconhecido");
-            return null;
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+  const fetchFormularios = useCallback(async () => {
+    if (!user?.empresaId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.get<IFormulario[]>(`/formularios?empresaId=${user.empresaId}`);
+      setFormularios(data.filter(f => f.ativo));
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || "Erro ao buscar formulários");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.empresaId]);
 
-    const deleteFeedback = useCallback(async (id: string) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const res = await fetch(`/feedback/${id}`, { method: "DELETE" });
-            if (!res.ok) throw new Error("Erro ao excluir feedback");
-            setFeedbacks((prev) => prev.filter((f) => f.id !== id));
-            return true;
-        } catch (err: any) {
-            setError(err.message || "Erro desconhecido");
-            return false;
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+  const submitDynamicFeedback = useCallback(async (data: DynamicFeedbackPayload) => {
+    if (!user?.empresaId) return null;
+    setLoading(true);
+    setError(null);
+    try {
+      const payload = { ...data, empresaId: user.empresaId }; // adiciona empresaId
+      const response = await api.post<FeedbackApiResponse>("/feedback/manual", payload);
+      setFeedbacks(prev => [response.data, ...prev]);
+      toast({ title: "Sucesso", description: "Feedback enviado!" });
+      return response.data;
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || "Erro ao submeter feedback");
+      toast({ title: "Erro", description: "Não foi possível enviar o feedback.", variant: "destructive" });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.empresaId, toast]);
 
-    return (
-        <FeedBackContext.Provider
-            value={{
-                feedbacks,
-                fetchFeedbacks,
-                getFeedbackByEnvioId,
-                createFeedback,
-                deleteFeedback,
-                loading,
-                error,
-            }}
-        >
-            {children}
-        </FeedBackContext.Provider>
-    );
+  const deleteFeedback = useCallback(async (id: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await api.delete(`/feedback/${id}?empresaId=${user?.empresaId}`);
+      setFeedbacks(prev => prev.filter(f => f.id !== id));
+      toast({ title: "Sucesso", description: "Feedback excluído!" });
+      return true;
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || "Erro ao deletar feedback");
+      toast({ title: "Erro", description: "Não foi possível excluir.", variant: "destructive" });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.empresaId, toast]);
+
+
+  return (
+    <FeedBackContext.Provider
+      value={{
+        feedbacks,
+        fetchFeedbacks,
+        submitDynamicFeedback,
+        deleteFeedback,
+        formularios,
+        fetchFormularios,
+        loading,
+        error
+      }}
+    >
+      {children}
+    </FeedBackContext.Provider>
+  );
 };

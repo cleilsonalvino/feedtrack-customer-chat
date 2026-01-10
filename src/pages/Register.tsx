@@ -1,81 +1,80 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-// import { useAuth } from "../contexts/AuthContext"; // Removido por enquanto, já que o cadastro não usa o contexto de autenticação diretamente
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 export const Register = () => {
-  const [nomeCompleto, setNomeCompleto] = useState("");
+  const [nome, setNomeEmpresa] = useState("");
+  const [cnpj, setCnpj] = useState("");
   const [email, setEmail] = useState("");
-  const [usuario, setUsuario] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [alerta, setAlerta] = useState<{ tipo: "success" | "danger"; mensagem: string } | null>(null);
+  const [plano, setPlano] = useState("FREE"); // exemplo de valor default
+  const [alerta, setAlerta] = useState<{
+    tipo: "success" | "danger";
+    mensagem: string;
+  } | null>(null);
+    const [loading, setLoading] = useState(false); // NOVO estado
 
   const navigate = useNavigate();
-  // const { registerUser } = useAuth(); // Se houver uma função de registro no seu contexto de autenticação
+  const { register } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAlerta(null);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setAlerta(null);
+  setLoading(true); // ✅ ativa o loading
 
-    // Validações dos campos
-    if (!nomeCompleto.trim()) {
-      setAlerta({ tipo: "danger", mensagem: "O campo Nome Completo é obrigatório." });
-      return;
-    }
-    if (!email.trim()) {
-      setAlerta({ tipo: "danger", mensagem: "O campo Email é obrigatório." });
-      return;
-    }
-    if (!usuario.trim()) {
-      setAlerta({ tipo: "danger", mensagem: "O campo Usuário é obrigatório." });
-      return;
-    }
-    if (!password.trim()) {
-      setAlerta({ tipo: "danger", mensagem: "A Senha é obrigatória." });
-      return;
-    }
-    if (password.length < 6) {
-      setAlerta({ tipo: "danger", mensagem: "A Senha deve ter no mínimo 6 caracteres." });
-      return;
-    }
-    if (password !== confirmPassword) {
-      setAlerta({ tipo: "danger", mensagem: "As senhas não coincidem." });
-      return;
-    }
+  if (!nome.trim()) {
+    setAlerta({
+      tipo: "danger",
+      mensagem: "O campo Nome da Empresa é obrigatório.",
+    });
+    setLoading(false); // ❌ desativa o loading se houver erro
+    return;
+  }
 
-    try {
-      // Aqui você faria a chamada para sua API de registro
-      // Exemplo: await registerUser(nomeCompleto, email, usuario, password);
+  try {
+    await register({
+      nome,
+      cnpj: cnpj.trim() ? cnpj : undefined,
+      email,
+      plano,
+    });
 
-      // Simulação de registro bem-sucedido
-      console.log("Dados para registro:", { nomeCompleto, email, usuario, password });
-      setAlerta({ tipo: "success", mensagem: "Cadastro realizado com sucesso! Redirecionando para o login..." });
-      
-      // Redireciona para a tela de login após um pequeno atraso
-      setTimeout(() => {
-        navigate("/login", { replace: true });
-      }, 2000);
+    setAlerta({
+      tipo: "success",
+      mensagem: "Empresa cadastrada com sucesso! Redirecionando... Verifique seu Email!",
+    });
 
-    } catch (error) {
-      // Erro real da API
-      // setAlerta({ tipo: "danger", mensagem: "Erro ao cadastrar. Tente novamente mais tarde." });
-      
-      // Simulação de erro (para testes)
-      setAlerta({ tipo: "danger", mensagem: "Erro ao cadastrar. Usuário ou e-mail já em uso." });
-    }
-  };
+    setTimeout(() => {
+      navigate("/login", { replace: true });
+    }, 3000);
+  } catch (error: any) {
+    setAlerta({
+      tipo: "danger",
+      mensagem: error.message || "Erro ao cadastrar. Tente novamente.",
+    });
+  } finally {
+    setLoading(false); // ✅ garante que o loading seja desativado
+  }
+};
+
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
       <div className="w-full max-w-4xl bg-white shadow-xl rounded-xl p-6 md:flex md:gap-8">
-        {/* Imagem */}
         <div className="hidden md:flex items-center justify-center">
-          <img src="./login.jpg" alt="Cadastro" className="w-[300px] h-[300px] object-cover rounded-md" />
+          <img
+            src="./login.jpg"
+            alt="Cadastro"
+            className="w-[300px] h-[300px] object-cover rounded-md"
+          />
         </div>
 
-        {/* Formulário de Cadastro */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 justify-center gap-4">
-          <h1 className="text-2xl font-bold text-center text-blue-800">Crie sua conta no FeedTrack</h1>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col flex-1 justify-center gap-4"
+        >
+          <h1 className="text-2xl font-bold text-center text-blue-800">
+            Cadastre sua empresa no FeedTrack
+          </h1>
 
           {alerta && (
             <div
@@ -89,7 +88,7 @@ export const Register = () => {
               <button
                 type="button"
                 onClick={() => setAlerta(null)}
-                className="text-xl leading-none font-bold ml-2"
+                className="text-xl font-bold ml-2"
               >
                 ×
               </button>
@@ -97,22 +96,45 @@ export const Register = () => {
           )}
 
           <div>
-            <label htmlFor="nomeCompleto" className="block text-sm font-medium text-gray-700">
-              Nome Completo
+            <label
+              htmlFor="nomeEmpresa"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Nome da Empresa
             </label>
             <input
-              id="nomeCompleto"
+              id="nomeEmpresa"
               type="text"
-              value={nomeCompleto}
-              onChange={(e) => setNomeCompleto(e.target.value)}
+              value={nome}
+              onChange={(e) => setNomeEmpresa(e.target.value)}
               required
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
             />
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
+            <label
+              htmlFor="cnpj"
+              className="block text-sm font-medium text-gray-700"
+            >
+              CNPJ (opcional)
+            </label>
+            <input
+              id="cnpj"
+              type="text"
+              value={cnpj}
+              onChange={(e) => setCnpj(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
+            />
+          </div>
+
+          {/* NOVO CAMPO EMAIL */}
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700"
+            >
+              E-mail
             </label>
             <input
               id="email"
@@ -124,61 +146,66 @@ export const Register = () => {
             />
           </div>
 
+          {/* NOVO CAMPO PLANO */}
           <div>
-            <label htmlFor="usuario" className="block text-sm font-medium text-gray-700">
-              Usuário
+            <label
+              htmlFor="plano"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Plano
             </label>
-            <input
-              id="usuario"
-              type="text"
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
-              required
+            <select
+              id="plano"
+              value={plano}
+              onChange={(e) => setPlano(e.target.value)}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Senha
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-              Confirmar Senha
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 px-3 py-2"
-            />
+            >
+              <option value="FREE">Free</option>
+              <option value="BASIC">Basic</option>
+              <option value="PRO">Pro</option>
+            </select>
           </div>
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white font-medium py-2 rounded-md hover:bg-blue-700 transition"
+            disabled={loading} // bloqueia clique enquanto carrega
+            className={`w-full bg-blue-600 text-white font-medium py-2 rounded-md hover:bg-blue-700 transition flex justify-center items-center ${
+              loading ? "cursor-not-allowed opacity-70" : ""
+            }`}
           >
-            Cadastrar
+            {loading ? (
+              <svg
+                className="animate-spin h-5 w-5 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8H4z"
+                ></path>
+              </svg>
+            ) : (
+              "Cadastrar Empresa"
+            )}
           </button>
 
-          <p className="text-center text-sm text-gray-500 mt-3">
-            Já tem uma conta?{" "}
-            <Link to="/login" className="text-blue-600 hover:underline">
-              Faça login
+
+          <div className="flex">
+            <p>voltar para</p>
+            <Link to="/login" className="underline text-blue-500 ml-1">
+              Login
             </Link>
-          </p>
+          </div>
         </form>
       </div>
     </div>

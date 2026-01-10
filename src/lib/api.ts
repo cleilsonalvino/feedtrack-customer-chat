@@ -1,13 +1,18 @@
-// src/lib/api.ts
-import axios from 'axios';
+import axios from "axios";
+
+//"https://server.feedtrack.site/api/v1"
+//"http://localhost:3006/api/v1"
+
 
 const api = axios.create({
-  // ATENÇÃO: Substitua pela URL real do seu backend.
-  // Se o seu backend roda na porta 3001, por exemplo, seria 'http://localhost:3001/api'
-  baseURL: 'http://server.feedtrack.site:3006/api/v1', 
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: "https://server.feedtrack.site/api/v1"
+, // ou sua URL de produção
 });
+
+// Sempre que recarregar a página, adiciona o token do localStorage
+const token = localStorage.getItem("authToken");
+if (token) {
+  api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+}
 
 export default api;

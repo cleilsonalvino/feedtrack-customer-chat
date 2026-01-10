@@ -1,238 +1,200 @@
-// src/pages/CustomersPage.tsx
-
-import React, { useState, useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   useCustomer,
   Customer,
   NewCustomerData,
-} from "@/contexts/CustomerContext";
-import { useProduct, Product } from "@/contexts/ProductContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+} from "../contexts/CustomerContext";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Badge } from "../components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+} from "../components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Search,
-  Plus,
-  Edit,
-  Trash2,
-  Mail,
-  Phone,
-  MapPin,
-  Loader2,
-  Eye,
-  RotateCcw,
-  PackagePlus,
-  List,
-  Replace,
-  User,
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+} from "../components/ui/select";
+import { Label } from "../components/ui/label";
+import { useToast } from "../hooks/use-toast";
+import { DialogDescription } from "@radix-ui/react-dialog";
+import { Edit, Loader2, Mail, MapPin, Phone, Plus, Search, Trash2 } from "lucide-react";
+
+// Interfaces IBGE
+interface IBGEUFResponse { id: number; sigla: string; nome: string; }
+interface IBGECityResponse { id: number; nome: string; }
 
 export const CustomersPage = () => {
-  // <<< CORRIGIDO: Usando a nova função `manageProductAssociation`
-  const {
-    customers,
-    addCustomer,
-    updateCustomer,
-    deleteCustomer,
-    manageCustomerProducts, 
-    loading,
-  } = useCustomer();
-  const { products: availableProducts } = useProduct();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, loading } = useCustomer();
   const { toast } = useToast();
 
+  // UI state
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isInactiveModalOpen, setIsInactiveModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [addingProductsToCustomer, setAddingProductsToCustomer] =
-    useState<Customer | null>(null);
-  const [viewingCustomerProducts, setViewingCustomerProducts] =
-    useState<Customer | null>(null);
-  const [replacingProduct, setReplacingProduct] = useState<{
-    customer: Customer;
-    oldProductId: string;
-  } | null>(null);
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
-  const [newCustomerData, setNewCustomerData] = useState<
-    Omit<NewCustomerData, "idsProdutos">
-  >({
-    pessoa: { nome: "", email: "", telefone: "" },
+  // IBGE state/city
+  const [estados, setEstados] = useState<IBGEUFResponse[]>([]);
+  const [cidades, setCidades] = useState<IBGECityResponse[]>([]);
+  const [selectedEstado, setSelectedEstado] = useState("");
+
+  const [editFormData, setEditFormData] = useState<NewCustomerData>({
+  nome: "",
+  email: "",
+  telefone: "",
+  estado: "",
+  cidade: "",
+});
+
+
+  // Form state
+  const [newCustomerData, setNewCustomerData] = useState<NewCustomerData>({
+    nome: "",
+    email: "",
+    telefone: "",
+    estado: "",
     cidade: "",
-    vendedorResponsavel: "",
   });
-  const [initialSelectedProductId, setInitialSelectedProductId] = useState<
-    string | null
-  >(null);
-  const [newlySelectedProducts, setNewlySelectedProducts] = useState<string[]>(
-    []
-  );
 
-  const { activeCustomers, inactiveCustomers } = useMemo(() => {
-    const active: Customer[] = [];
-    const inactive: Customer[] = [];
-    customers.forEach((c) => {
-      c.status === "ATIVO" ? active.push(c) : inactive.push(c);
+  // Fetch estados
+  useEffect(() => {
+    const fetchEstados = async () => {
+      try {
+        const res = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome");
+        const data = await res.json();
+        setEstados(data);
+      } catch (error) {
+        toast({ title: "Erro de API", description: "Não foi possível carregar estados.", variant: "destructive" });
+      }
+    };
+    fetchEstados();
+  }, [toast]);
+
+  // Fetch cidades
+  useEffect(() => {
+    if (!selectedEstado) { setCidades([]); return; }
+    const fetchCidades = async () => {
+      try {
+        const res = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedEstado}/municipios`);
+        const data = await res.json();
+        setCidades(data);
+      } catch {
+        toast({ title: "Erro de API", description: "Não foi possível carregar cidades.", variant: "destructive" });
+      }
+    };
+    fetchCidades();
+  }, [selectedEstado, toast]);
+
+  // Prepara edição
+// Preenche o formulário de edição quando um cliente é selecionado
+useEffect(() => {
+  if (editingCustomer) {
+    setEditFormData({
+      nome: editingCustomer.nome || "",
+      email: editingCustomer.email || "",
+      telefone: formatPhone(editingCustomer.telefone || ""),
+      estado: editingCustomer.estado || "",
+      cidade: editingCustomer.cidade || "",
     });
-    return { activeCustomers: active, inactiveCustomers: inactive };
-  }, [customers]);
+    if (editingCustomer.estado) setSelectedEstado(editingCustomer.estado);
+  }
+}, [editingCustomer]);
 
-  const filteredCustomers = useMemo(
-    () =>
-      activeCustomers.filter(
-        (customer) =>
-          (customer.pessoa.nome || "")
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          (customer.pessoa.email || "")
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())
-      ),
-    [activeCustomers, searchTerm]
-  );
+
+  // Separação ativos/inativos
+  const activeCustomers = useMemo(() => customers.filter(c => c.status === "ATIVO"), [customers]);
+  const inactiveCustomers = useMemo(() => customers.filter(c => c.status !== "ATIVO"), [customers]);
+
+  // Filtragem por busca
+  const filteredCustomers = useMemo(() =>
+    activeCustomers.filter(c =>
+      (c.nome || "").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").includes(searchTerm.toLowerCase()) ||
+      (c.email || "").toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  , [activeCustomers, searchTerm]);
+
+  // Validação
+  const validateCustomer = (customer: NewCustomerData | Customer) => {
+    const errors: { [key: string]: string } = {};
+    if (!customer.nome?.trim()) errors.nome = "Nome é obrigatório";
+    if (!customer.email?.trim()) errors.email = "Email é obrigatório";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) errors.email = "Email inválido";
+
+    if (customer.telefone) {
+      const telefoneRegex = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
+      if (!telefoneRegex.test(customer.telefone)) errors.telefone = "Telefone inválido";
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Formata telefone
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length <= 2) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0,2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6,10)}`;
+  };
 
   const handleAddCustomer = async () => {
-    if (
-      !newCustomerData.pessoa.nome ||
-      !newCustomerData.pessoa.email ||
-      !initialSelectedProductId
-    ) {
-      toast({
-        title: "Erro de Validação",
-        description: "Nome, email e um produto inicial são obrigatórios.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const payload: NewCustomerData = {
-      ...newCustomerData,
-      idsProdutos: [initialSelectedProductId],
-    };
-    const createdCustomer = await addCustomer(payload);
+    if (!validateCustomer(newCustomerData)) return;
+    const customerToAdd = { ...newCustomerData, telefone: newCustomerData.telefone?.replace(/\D/g, "") };
+    const createdCustomer = await addCustomer(customerToAdd);
     if (createdCustomer) {
-      setNewCustomerData({
-        pessoa: { nome: "", email: "", telefone: "" },
-        cidade: "",
-        vendedorResponsavel: "",
-      });
-      setInitialSelectedProductId(null);
+      setNewCustomerData({ nome:"", email:"", telefone:"", estado:"", cidade:"" });
+      setSelectedEstado("");
+      setFormErrors({});
       setIsAddDialogOpen(false);
     }
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingCustomer) return;
-    try {
-      await updateCustomer(editingCustomer);
-      setEditingCustomer(null);
-      toast({ title: "Sucesso!", description: "Cliente atualizado." });
-    } catch (error) {
-      // O erro já é tratado no contexto
-    }
+const handleSaveEdit = async () => {
+  if (!editingCustomer || !validateCustomer(editFormData)) return;
+
+  const customerToUpdate = {
+    ...editingCustomer,
+    ...editFormData,
+    telefone: editFormData.telefone.replace(/\D/g, ""),
   };
 
+  await updateCustomer(customerToUpdate);
+  setEditingCustomer(null);
+  setFormErrors({});
+  toast({ title: "Sucesso!", description: "Cliente atualizado." });
+};
+
   const handleDeleteCustomer = async (id: string) => {
-    if (window.confirm("Tem certeza que deseja desativar este cliente?")) {
+    if (window.confirm("Tem certeza que deseja excluir este cliente?")) {
       await deleteCustomer(id);
     }
   };
 
-  const handleReactivateCustomer = async (customer: Customer) => {
-    const customerToReactivate = { ...customer, status: "ATIVO" };
-    try {
-      await updateCustomer(customerToReactivate);
-      toast({
-        title: "Sucesso!",
-        description: `Cliente "${customer.pessoa.nome}" foi reativado.`,
-      });
-    } catch (error) {
-      // O erro já é tratado no contexto
-    }
-  };
-
-  const handleSaveNewProducts = async () => {
-    if (!addingProductsToCustomer || newlySelectedProducts.length === 0) return;
-    try {
-      await manageCustomerProducts(addingProductsToCustomer.id, {
-        idsProdutosParaAdicionar: newlySelectedProducts,
-      });
-      setAddingProductsToCustomer(null);
-      setNewlySelectedProducts([]);
-      // O toast de sucesso já está na função do contexto
-    } catch (error) {
-      // O erro já é tratado no contexto
-    }
-  };
-
-
-  const handleRemoveProduct = async (customer: Customer, productId: string) => {
-    if (
-      window.confirm("Tem certeza que deseja remover este produto do cliente?")
-    ) {
-      try {
-        await manageCustomerProducts(customer.id, {
-          idsProdutosParaRemover: [productId],
-        });
-        // Fecha o modal. A atualização dos dados é feita pelo fetch no contexto.
-        setViewingCustomerProducts(null);
-      } catch (error) {
-        // O erro já é tratado no contexto
-      }
-    }
-  };
-
-  const handleReplaceProduct = async (newProductId: string) => {
-    if (!replacingProduct) return;
-    try {
-      await manageCustomerProducts(replacingProduct.customer.id, {
-        idsProdutosParaAdicionar: [newProductId],
-        idsProdutosParaRemover: [replacingProduct.oldProductId],
-      });
-      setReplacingProduct(null);
-      setViewingCustomerProducts(null); // Fecha ambos os modais
-    } catch (error) {
-      // O erro já é tratado no contexto
-    }
-  };
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
+    <div className="p-4 md:p-8 space-y-6 mt-10">
+      <div className="flex flex-col ">
+        <div className="flex items-baseline">
           <h1 className="text-3xl font-bold">Gestão de Clientes</h1>
-          <p className="text-muted-foreground">
+          <p className="ml-4 text-muted-foreground">
             Cadastre e gerencie seus clientes
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsInactiveModalOpen(true)}
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            Ver Inativos ({inactiveCustomers.length})
-          </Button>
+        <div className="flex justify-between items-center gap-2 flex-wrap mt-4">
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -247,103 +209,111 @@ export const CustomersPage = () => {
                   Preencha as informações para criar um novo cliente.
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                <div className="space-y-2">
                   <Label htmlFor="nome">Nome *</Label>
                   <Input
                     id="nome"
-                    value={newCustomerData.pessoa.nome}
+                    value={newCustomerData.nome}
                     onChange={(e) =>
                       setNewCustomerData((prev) => ({
                         ...prev,
-                        pessoa: { ...prev.pessoa, nome: e.target.value },
+                        nome: e.target.value,
                       }))
                     }
                   />
                 </div>
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
                   <Input
                     id="email"
                     type="email"
-                    value={newCustomerData.pessoa.email}
+                    value={newCustomerData.email}
                     onChange={(e) =>
                       setNewCustomerData((prev) => ({
                         ...prev,
-                        pessoa: { ...prev.pessoa, email: e.target.value },
+                        email: e.target.value,
                       }))
                     }
                   />
                 </div>
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="telefone">Telefone</Label>
-                  <Input
-                    id="telefone"
-                    value={newCustomerData.pessoa.telefone}
-                    onChange={(e) =>
-                      setNewCustomerData((prev) => ({
-                        ...prev,
-                        pessoa: { ...prev.pessoa, telefone: e.target.value },
-                      }))
-                    }
-                  />
+<Input
+  id="telefone"
+  value={newCustomerData.telefone}
+  onChange={(e) => {
+    const rawValue = e.target.value;
+    setNewCustomerData((prev) => ({
+      ...prev,
+      telefone: formatPhone(rawValue),
+    }));
+  }}
+  placeholder="(79) 9861-5536"
+/>
+
+                  {formErrors.telefone && (
+                    <p className="text-red-500 text-sm">
+                      {formErrors.telefone}
+                    </p>
+                  )}
                 </div>
-                <div>
-                  <Label htmlFor="cidade">Cidade</Label>
-                  <Input
-                    id="cidade"
-                    value={newCustomerData.cidade}
-                    onChange={(e) =>
-                      setNewCustomerData((prev) => ({
-                        ...prev,
-                        cidade: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="vendedor">Vendedor Responsável</Label>
-                  <Input
-                    id="vendedor"
-                    value={newCustomerData.vendedorResponsavel}
-                    onChange={(e) =>
-                      setNewCustomerData((prev) => ({
-                        ...prev,
-                        vendedorResponsavel: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="produtos">Produto Inicial *</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="estado">Estado</Label>
                   <Select
-                    onValueChange={(value) =>
-                      setInitialSelectedProductId(value)
-                    }
+                    value={newCustomerData.estado}
+                    onValueChange={(value) => {
+                      setSelectedEstado(value);
+                      setNewCustomerData((prev) => ({
+                        ...prev,
+                        estado: value,
+                        cidade: "", // Reset city on state change
+                      }));
+                    }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione um produto" />
+                      <SelectValue placeholder="Selecione um estado" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableProducts
-                        .filter((p) => p.ativo)
-                        .map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.nome}
-                          </SelectItem>
-                        ))}
+                      {estados.map((uf) => (
+                        <SelectItem key={uf.id} value={uf.sigla}>
+                          {uf.nome}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsAddDialogOpen(false)}
+                <div className="space-y-2">
+                  <Label htmlFor="cidade">Cidade</Label>
+                  <Select
+                    value={newCustomerData.cidade}
+                    onValueChange={(value) =>
+                      setNewCustomerData((prev) => ({ ...prev, cidade: value }))
+                    }
+                    disabled={!newCustomerData.estado || cidades.length === 0}
                   >
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleAddCustomer}>Adicionar Cliente</Button>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma cidade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cidades.map((city) => (
+                        <SelectItem key={city.id} value={city.nome}>
+                          {city.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAddDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleAddCustomer}>Adicionar Cliente</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -388,7 +358,7 @@ export const CustomersPage = () => {
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="font-semibold text-lg">
-                          {customer.pessoa.nome}
+                          {customer.nome}
                         </h3>
                         <Badge
                           variant={
@@ -400,42 +370,24 @@ export const CustomersPage = () => {
                           {customer.status}
                         </Badge>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
+                      <div className="gap-x-4 gap-y-2 text-sm text-muted-foreground flex flex-wrap">
+                        <div className="flex items-center gap-2 ">
                           <Mail className="w-4 h-4" />
-                          {customer.pessoa.email}
+                          {customer.email}
                         </div>
                         <div className="flex items-center gap-2">
                           <Phone className="w-4 h-4" />
-                          {customer.pessoa.telefone || "Não informado"}
+                          {customer.telefone || "Não informado"}
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4" />
-                          {customer.cidade || "Não informado"}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4" />
-                          {customer.vendedorResponsavel || "Não informado"}
+                          {customer.cidade && customer.estado
+                            ? `${customer.cidade} - ${customer.estado}`
+                            : "Não informado"}
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        title="Ver Produtos"
-                        onClick={() => setViewingCustomerProducts(customer)}
-                      >
-                        <List className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        title="Adicionar Produtos"
-                        onClick={() => setAddingProductsToCustomer(customer)}
-                      >
-                        <PackagePlus className="w-4 h-4" />
-                      </Button>
+                    <div className="flex gap-2 flex-wrap justify-end">
                       <Button
                         variant="outline"
                         size="icon"
@@ -466,323 +418,114 @@ export const CustomersPage = () => {
         </CardContent>
       </Card>
 
-      {editingCustomer && (
-        <Dialog
-          open={!!editingCustomer}
-          onOpenChange={() => setEditingCustomer(null)}
-        >
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Editar Cliente</DialogTitle>
-              <DialogDescription>
-                Altere os dados do cliente conforme necessário.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label>Nome</Label>
-                <Input
-                  value={editingCustomer.pessoa.nome}
-                  onChange={(e) =>
-                    setEditingCustomer((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            pessoa: { ...prev.pessoa, nome: e.target.value },
-                          }
-                        : null
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={editingCustomer.pessoa.email}
-                  onChange={(e) =>
-                    setEditingCustomer((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            pessoa: { ...prev.pessoa, email: e.target.value },
-                          }
-                        : null
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label>Telefone</Label>
-                <Input
-                  value={editingCustomer.pessoa.telefone}
-                  onChange={(e) =>
-                    setEditingCustomer((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            pessoa: {
-                              ...prev.pessoa,
-                              telefone: e.target.value,
-                            },
-                          }
-                        : null
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label>Cidade</Label>
-                <Input
-                  value={editingCustomer.cidade}
-                  onChange={(e) =>
-                    setEditingCustomer((prev) =>
-                      prev ? { ...prev, cidade: e.target.value } : null
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label>Vendedor Responsável</Label>
-                <Input
-                  value={editingCustomer.vendedorResponsavel}
-                  onChange={(e) =>
-                    setEditingCustomer((prev) =>
-                      prev
-                        ? { ...prev, vendedorResponsavel: e.target.value }
-                        : null
-                    )
-                  }
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setEditingCustomer(null)}
-                >
-                  Cancelar
-                </Button>
-                <Button onClick={handleSaveEdit}>Guardar Alterações</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+{/* Edit Customer Dialog */}
+{editingCustomer && (
+  <Dialog
+    open={!!editingCustomer}
+    onOpenChange={(open) => !open && setEditingCustomer(null)}
+  >
+    <DialogContent className="max-w-2xl">
+      <DialogHeader>
+        <DialogTitle>Editar Cliente</DialogTitle>
+        <DialogDescription>
+          Altere os dados do cliente conforme necessário.
+        </DialogDescription>
+      </DialogHeader>
 
-      <Dialog open={isInactiveModalOpen} onOpenChange={setIsInactiveModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Clientes Inativos</DialogTitle>
-            <DialogDescription>
-              Visualize e reative clientes inativos.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-4 max-h-[60vh] overflow-y-auto">
-            {inactiveCustomers.length > 0 ? (
-              inactiveCustomers.map((customer) => (
-                <div
-                  key={customer.id}
-                  className="p-3 border rounded-md flex justify-between items-center"
-                >
-                  <div>
-                    <p className="font-medium text-muted-foreground">
-                      {customer.pessoa.nome}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {customer.pessoa.email}
-                    </p>
-                  </div>
-                  <Button onClick={() => handleReactivateCustomer(customer)}>
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Reativar
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <p className="text-center text-gray-500">
-                Nenhum cliente inativo.
-              </p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Formulário de edição */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+        <div className="space-y-2">
+          <Label>Nome</Label>
+          <Input
+            value={editFormData.nome}
+            onChange={(e) =>
+              setEditFormData((prev) => ({ ...prev, nome: e.target.value }))
+            }
+          />
+          {formErrors.nome && <p className="text-red-500 text-sm">{formErrors.nome}</p>}
+        </div>
 
-      {addingProductsToCustomer && (
-        <Dialog
-          open={!!addingProductsToCustomer}
-          onOpenChange={() => {
-            setAddingProductsToCustomer(null);
-            setNewlySelectedProducts([]);
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                Adicionar Produtos a {addingProductsToCustomer.pessoa.nome}
-              </DialogTitle>
-              <DialogDescription>
-                Selecione os produtos para adicionar a este cliente.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <Label>Produtos Disponíveis</Label>
-              <div className="space-y-2 max-h-60 overflow-y-auto border p-2 rounded-md">
-                {availableProducts
-                  .filter(
-                    (p) =>
-                      p.ativo &&
-                      !addingProductsToCustomer.produtos.some(
-                        (cp) => cp.id === p.id
-                      )
-                  )
-                  .map((product) => (
-                    <div
-                      key={product.id}
-                      className="flex items-center space-x-2"
-                    >
-                      <Checkbox
-                        id={`prod-${product.id}`}
-                        onCheckedChange={(checked) => {
-                          setNewlySelectedProducts((prev) =>
-                            checked
-                              ? [...prev, product.id]
-                              : prev.filter((id) => id !== product.id)
-                          );
-                        }}
-                      />
-                      <label
-                        htmlFor={`prod-${product.id}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {product.nome}
-                      </label>
-                    </div>
-                  ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setAddingProductsToCustomer(null);
-                  setNewlySelectedProducts([]);
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveNewProducts}>
-                Adicionar Selecionados
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+        <div className="space-y-2">
+          <Label>Email</Label>
+          <Input
+            type="email"
+            value={editFormData.email}
+            onChange={(e) =>
+              setEditFormData((prev) => ({ ...prev, email: e.target.value }))
+            }
+          />
+          {formErrors.email && <p className="text-red-500 text-sm">{formErrors.email}</p>}
+        </div>
 
-      {viewingCustomerProducts && (
-        <Dialog
-          open={!!viewingCustomerProducts}
-          onOpenChange={() => setViewingCustomerProducts(null)}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                Produtos de {viewingCustomerProducts.pessoa.nome}
-              </DialogTitle>
-              <DialogDescription>
-                Visualize, remova ou substitua os produtos deste cliente.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2 py-4 max-h-[60vh] overflow-y-auto">
-              {viewingCustomerProducts.produtos.length > 0 ? (
-                viewingCustomerProducts.produtos.map((product) => (
-                  <div
-                    key={product.id}
-                    className="p-3 border rounded-md flex justify-between items-center"
-                  >
-                    <div>
-                      <p className="font-medium">{product.nome}</p>
-                      <p className="text-sm text-gray-500">
-                        {product.descricao}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        title="Substituir Produto"
-                        onClick={() =>
-                          setReplacingProduct({
-                            customer: viewingCustomerProducts,
-                            oldProductId: product.id,
-                          })
-                        }
-                      >
-                        <Replace className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        title="Remover Produto"
-                        onClick={() =>
-                          handleRemoveProduct(
-                            viewingCustomerProducts,
-                            product.id
-                          )
-                        }
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-gray-500">
-                  Este cliente ainda não possui produtos.
-                </p>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+        <div className="space-y-2">
+          <Label>Telefone</Label>
+          <Input
+            value={editFormData.telefone}
+            onChange={(e) =>
+              setEditFormData((prev) => ({
+                ...prev,
+                telefone: formatPhone(e.target.value),
+              }))
+            }
+          />
+          {formErrors.telefone && <p className="text-red-500 text-sm">{formErrors.telefone}</p>}
+        </div>
 
-      {replacingProduct && (
-        <Dialog
-          open={!!replacingProduct}
-          onOpenChange={() => setReplacingProduct(null)}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Substituir Produto</DialogTitle>
-              <DialogDescription>
-                Selecione o novo produto para substituir o antigo.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <Label>Selecione o novo produto</Label>
-              <Select onValueChange={handleReplaceProduct}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Escolha um novo produto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableProducts
-                    .filter(
-                      (p) =>
-                        p.ativo &&
-                        !replacingProduct.customer.produtos.some(
-                          (cp) => cp.id === p.id
-                        )
-                    )
-                    .map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.nome}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+        <div className="space-y-2">
+          <Label>Estado</Label>
+          <Select
+            value={editFormData.estado}
+            onValueChange={(value) => {
+              setSelectedEstado(value);
+              setEditFormData((prev) => ({ ...prev, estado: value, cidade: "" }));
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione um estado" />
+            </SelectTrigger>
+            <SelectContent>
+              {estados.map((uf) => (
+                <SelectItem key={uf.id} value={uf.sigla}>
+                  {uf.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Cidade</Label>
+          <Select
+            value={editFormData.cidade}
+            onValueChange={(value) =>
+              setEditFormData((prev) => ({ ...prev, cidade: value }))
+            }
+            disabled={!editFormData.estado || cidades.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione uma cidade" />
+            </SelectTrigger>
+            <SelectContent>
+              {cidades.map((city) => (
+                <SelectItem key={city.id} value={city.nome}>
+                  {city.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Botões */}
+      <div className="flex justify-end gap-2 pt-4">
+        <Button variant="outline" onClick={() => setEditingCustomer(null)}>
+          Cancelar
+        </Button>
+        <Button onClick={handleSaveEdit}>Guardar Alterações</Button>
+      </div>
+    </DialogContent>
+  </Dialog>
+)}
     </div>
   );
 };
